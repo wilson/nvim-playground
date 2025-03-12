@@ -120,9 +120,14 @@ require("lazy").setup({
         end,
         -- Customize specific syntax highlighting
         on_highlights = function(highlights, colors)
-          -- Improve string highlighting
-          highlights.String = { fg = "#9ece6a" }  -- Light green for strings
-          highlights.Character = { fg = "#9ece6a" }
+          -- Improve string highlighting - use a more visible color instead of white on cyan
+          highlights.String = { fg = "#ff9e64" }  -- Orange for strings
+          highlights.Character = { fg = "#ff9e64" }
+          
+          -- Fix function highlighting - use blue instead of green
+          highlights.Function = { fg = "#7aa2f7" }  -- Blue for functions
+          highlights.TSFunction = { fg = "#7aa2f7" }
+          highlights.TSFuncBuiltin = { fg = "#7aa2f7" }  -- Built-in functions like "require"
           
           -- Make sure we're in dark mode
           highlights.Normal = { bg = colors.bg, fg = colors.fg }
