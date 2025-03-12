@@ -99,7 +99,7 @@ require("lazy").setup({
       require("tokyonight").setup({
         style = "night",
         light_style = "day",
-        transparent = false,
+        transparent = true,  -- Enable transparency to use terminal background
         terminal_colors = true,
         styles = {
           comments = { italic = true },
@@ -112,6 +112,11 @@ require("lazy").setup({
         hide_inactive_statusline = false,
         dim_inactive = false,
         lualine_bold = false,
+        -- Darker background for better contrast with terminal
+        on_colors = function(colors)
+          colors.bg = "#1a1b26"  -- Slightly darker background
+          colors.bg_dark = "#16161e"  -- Even darker background for UI elements
+        end,
       })
       vim.cmd([[colorscheme tokyonight-night]])
     end,
