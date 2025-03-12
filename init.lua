@@ -185,9 +185,18 @@ vim.keymap.set("n", "<leader>p", function()
   vim.cmd("Copilot panel")
 end, { desc = "Open Copilot panel" })
 
+-- Whitespace highlighting
 -- Trailing whitespace
-vim.fn.matchadd("WhitespaceTrailing", [[\s\{1,}$]])
-vim.api.nvim_set_hl(0, "WhitespaceTrailing", { link = "diffText" })
+vim.fn.matchadd("WhitespaceTrailing", [[\s\+$]])
+-- Mixed tabs and spaces
+vim.fn.matchadd("WhitespaceMixed", [[\(\t \|\s\+\t\)]])
+-- Blank lines with whitespace
+vim.fn.matchadd("WhitespaceBlankline", [[^\s\+$]])
+
+-- Set highlighting colors
+vim.api.nvim_set_hl(0, "WhitespaceTrailing", { bg = "#3f2d3d", fg = "#ff5370" })
+vim.api.nvim_set_hl(0, "WhitespaceMixed", { bg = "#2d3f3d", fg = "#89ddff" })
+vim.api.nvim_set_hl(0, "WhitespaceBlankline", { bg = "#3d3d2d", fg = "#ffcb6b" })
 
 -- Editor settings
 vim.opt.tabstop = 2
