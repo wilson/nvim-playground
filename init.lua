@@ -185,7 +185,7 @@ vim.opt.signcolumn = "yes"
 
 -- Set a colorscheme with better syntax highlighting
 vim.opt.termguicolors = true -- Enable true color support
-vim.cmd('colorscheme habamax') -- Using a built-in colorscheme
+-- Using tokyonight-night colorscheme (already configured in the plugins section)
 
 -- Enhance Treesitter highlighting
 local treesitter_parser_config = require('nvim-treesitter.parsers').get_parser_configs()
