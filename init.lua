@@ -106,6 +106,7 @@ require("lazy").setup({
           keywords = { italic = true },
           functions = {},
           variables = {},
+          strings = {},  -- No italic for strings
         },
         sidebars = { "qf", "help" },
         day_brightness = 0.3,
@@ -116,6 +117,16 @@ require("lazy").setup({
         on_colors = function(colors)
           colors.bg = "#1a1b26"  -- Slightly darker background
           colors.bg_dark = "#16161e"  -- Even darker background for UI elements
+        end,
+        -- Customize specific syntax highlighting
+        on_highlights = function(highlights, colors)
+          -- Improve string highlighting
+          highlights.String = { fg = "#9ece6a" }  -- Light green for strings
+          highlights.Character = { fg = "#9ece6a" }
+          
+          -- Make sure we're in dark mode
+          highlights.Normal = { bg = colors.bg, fg = colors.fg }
+          highlights.NormalFloat = { bg = colors.bg_dark, fg = colors.fg }
         end,
       })
       vim.cmd([[colorscheme tokyonight-night]])
@@ -208,6 +219,9 @@ vim.opt.signcolumn = "yes"
 -- Set a colorscheme with better syntax highlighting
 vim.opt.termguicolors = true -- Enable true color support
 -- Using tokyonight-night colorscheme (already configured in the plugins section)
+
+-- Force dark background
+vim.opt.background = "dark"
 
 -- Enhance Treesitter highlighting
 local treesitter_parser_config = require('nvim-treesitter.parsers').get_parser_configs()
