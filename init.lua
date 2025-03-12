@@ -30,7 +30,7 @@ require("lazy").setup({
         ensure_installed = { "lua", "vim", "vimdoc", "rust" },
         highlight = { 
           enable = true,
-          additional_vim_regex_highlighting = false,
+          additional_vim_regex_highlighting = true, -- Enable both for better highlighting
         },
         indent = { enable = true },
         textobjects = {
@@ -87,6 +87,16 @@ require("lazy").setup({
     ft = "rust",
     init = function()
       vim.g.rustfmt_autosave = 1
+    end,
+  },
+
+  -- Colorscheme
+  {
+    "folke/tokyonight.nvim",
+    lazy = false,
+    priority = 1000,
+    config = function()
+      vim.cmd([[colorscheme tokyonight-night]])
     end,
   },
 
@@ -173,8 +183,19 @@ vim.opt.expandtab = true
 vim.opt.number = true
 vim.opt.signcolumn = "yes"
 
--- Set a colorscheme
+-- Set a colorscheme with better syntax highlighting
+vim.opt.termguicolors = true -- Enable true color support
 vim.cmd('colorscheme habamax') -- Using a built-in colorscheme
+
+-- Enhance Treesitter highlighting
+local treesitter_parser_config = require('nvim-treesitter.parsers').get_parser_configs()
+treesitter_parser_config.lua = {
+  install_info = {
+    url = "https://github.com/MunifTanjim/tree-sitter-lua",
+    files = {"src/parser.c", "src/scanner.c"},
+    branch = "main"
+  },
+}
 vim.opt.termguicolors = true
 vim.opt.updatetime = 250
 vim.opt.timeoutlen = 300
