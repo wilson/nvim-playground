@@ -289,8 +289,8 @@ vim.opt.laststatus = 2  -- Always show statusline
 vim.opt.showmode = false  -- Don't show mode in command line
 
 -- Custom statusline function
--- Define in _G to make it accessible to v:lua
-_G.get_statusline = function()
+-- Define in global scope to make it accessible to v:lua
+get_statusline = function()
   local mode = vim.api.nvim_get_mode().mode
   local filename = vim.fn.expand('%:t')
   local modified = vim.bo.modified and '[+]' or ''
