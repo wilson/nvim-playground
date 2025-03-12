@@ -103,8 +103,9 @@ require("lazy").setup({
         styles = {
           comments = { italic = true },
           keywords = { italic = true },
+          functions = {},
+          variables = {},
         },
-        -- Optimize for 256-color terminal
         on_colors = function(colors)
           colors.bg = "#1a1b26"
           colors.bg_dark = "#16161e"
@@ -112,6 +113,9 @@ require("lazy").setup({
         on_highlights = function(highlights, colors)
           highlights.String = { fg = "#ff9e64" }
           highlights.Function = { fg = "#7aa2f7" }
+          -- Ensure proper highlighting
+          highlights.Normal = { bg = colors.bg, fg = colors.fg }
+          highlights.NormalFloat = { bg = colors.bg_dark, fg = colors.fg }
         end,
       })
       vim.cmd([[colorscheme tokyonight-night]])
@@ -191,7 +195,6 @@ vim.opt.shiftwidth = 2
 vim.opt.expandtab = true
 vim.opt.number = true
 vim.opt.signcolumn = "yes"
-vim.opt.termguicolors = true
 vim.opt.background = "dark"
 vim.opt.updatetime = 250
 vim.opt.timeoutlen = 300
@@ -199,8 +202,10 @@ vim.opt.undofile = true
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
 
--- Optimize for 256-color terminal
-if vim.fn.has('termguicolors') == 0 or vim.env.TERM == 'xterm-256color' then
+-- Terminal color settings
+vim.opt.termguicolors = true  -- Enable true colors support
+-- Only disable if terminal doesn't support it
+if vim.fn.has('termguicolors') == 0 then
   vim.opt.termguicolors = false
 end
 
