@@ -250,15 +250,15 @@ vim.opt.laststatus = 2  -- Always show statusline
 vim.opt.showmode = false  -- Don't show mode in command line
 
 -- Custom statusline function
-function _G.statusline()
+local function get_statusline()
   local mode = vim.api.nvim_get_mode().mode
   local filename = vim.fn.expand('%:t')
   local modified = vim.bo.modified and '[+]' or ''
   local readonly = vim.bo.readonly and '[RO]' or ''
   local filetype = vim.bo.filetype ~= '' and vim.bo.filetype or 'no ft'
-  local pos = string.format('%d:%d', vim.fn.line('.'), vim.fn.col('.'))
+  local pos = vim.fn.printf('%d:%d', vim.fn.line('.'), vim.fn.col('.'))
   
-  return string.format(
+  return vim.fn.printf(
     '%%#StatusLineMode#  %s %%#StatusLineFile# %s%s%s %%#StatusLineInfo# [%s] %%=%s ',
     mode:upper(),
     filename,
@@ -269,8 +269,16 @@ function _G.statusline()
   )
 end
 
+-- Make the function available globally but avoid direct _G mutation
+vim.api.nvim_create_autocmd("User", {
+  pattern = "StatusLineUpdate",
+  callback = function()
+    return get_statusline()
+  end
+})
+
 -- Set the statusline
-vim.opt.statusline = '%!v:lua.statusline()'
+vim.opt.statusline = '%!v:lua.get_statusline()'
 
 -- Statusline colors
 vim.api.nvim_set_hl(0, "StatusLineMode", { bg = "#7aa2f7", fg = "#1a1b26", bold = true })
