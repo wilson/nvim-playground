@@ -2,18 +2,17 @@
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not vim.loop.fs_stat(lazypath) then
   -- Create the parent directory if it doesn't exist
-  vim.fn.mkdir(vim.fn.fnamemodify(lazypath, ":h"), "p")
+  local parent_dir = vim.fn.stdpath("data") .. "/lazy"
+  vim.fn.mkdir(parent_dir, "p")
   
   -- Clone into the parent directory with the correct target folder name
-  local parent_dir = vim.fn.fnamemodify(lazypath, ":h")
-  -- Redirect output to /dev/null to hide commit hash
   vim.fn.system({
     "git",
     "clone",
     "--filter=blob:none",
     "https://github.com/folke/lazy.nvim.git",
     "--branch=stable", -- latest stable release
-    lazypath,
+    parent_dir,
     ">/dev/null", -- Redirect stdout
     "2>/dev/null", -- Redirect stderr
   })
