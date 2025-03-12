@@ -19,8 +19,8 @@ end
 vim.opt.rtp:prepend(lazypath)
 
 -- Set leader key before lazy setup
-vim.g.mapleader = " "
-vim.g.maplocalleader = " "
+vim.g.mapleader = "\\"
+vim.g.maplocalleader = "\\"
 
 -- Add a splash screen to hide startup messages
 vim.opt.shortmess:append("I") -- Disable intro message
