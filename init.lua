@@ -280,6 +280,21 @@ vim.keymap.set("n", "<leader>q", "<cmd>q<cr>", { desc = "Quit" })
 vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
 vim.keymap.set("n", "<leader>ll", function() require("lint").try_lint() end, { desc = "Run linter" })
 
+-- Automatically run linter on certain events
+vim.api.nvim_create_autocmd({ "BufWritePost", "BufEnter" }, {
+  callback = function()
+    require("lint").try_lint()
+  end,
+})
+
+-- Format Lua code on save
+vim.api.nvim_create_autocmd("BufWritePre", {
+  pattern = "*.lua",
+  callback = function()
+    vim.lsp.buf.format({ async = false })
+  end,
+})
+
 -- Create .luacheckrc file if it doesn't exist
 local luacheckrc_path = vim.fn.getcwd() .. "/.luacheckrc"
 if vim.fn.filereadable(luacheckrc_path) == 0 then
