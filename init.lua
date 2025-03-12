@@ -1,6 +1,7 @@
 -- Bootstrap lazy.nvim
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not vim.loop.fs_stat(lazypath) then
+  -- Redirect output to /dev/null to hide commit hash
   vim.fn.system({
     "git",
     "clone",
@@ -8,6 +9,8 @@ if not vim.loop.fs_stat(lazypath) then
     "https://github.com/folke/lazy.nvim.git",
     "--branch=stable", -- latest stable release
     lazypath,
+    ">/dev/null", -- Redirect stdout
+    "2>/dev/null", -- Redirect stderr
   })
 end
 vim.opt.rtp:prepend(lazypath)
@@ -15,6 +18,9 @@ vim.opt.rtp:prepend(lazypath)
 -- Set leader key before lazy setup
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
+
+-- Add a splash screen to hide startup messages
+vim.opt.shortmess:append("I") -- Disable intro message
 
 -- Plugin setup
 require("lazy").setup({
