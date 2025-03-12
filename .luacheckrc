@@ -1,8 +1,8 @@
 -- Lua linter configuration
 std = {
-  globals = {"vim"},
+  globals = {"vim", "get_statusline"},
   read_globals = {
-    "vim",
+    "vim", 
     -- Lua standard library
     "pcall", "pairs", "ipairs", "require",
     "string", "table", "math", "os", "io", "coroutine",

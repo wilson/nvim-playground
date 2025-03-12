@@ -290,7 +290,7 @@ vim.opt.showmode = false  -- Don't show mode in command line
 
 -- Custom statusline function
 -- Define in global scope to make it accessible to v:lua
-get_statusline = function()
+local statusline_fn = function()
   local mode = vim.api.nvim_get_mode().mode
   local filename = vim.fn.expand('%:t')
   local modified = vim.bo.modified and '[+]' or ''
@@ -308,6 +308,9 @@ get_statusline = function()
     pos
   )
 end
+
+-- Explicitly declare as global for v:lua access
+_G.get_statusline = statusline_fn
 
 -- Set the statusline
 vim.opt.statusline = '%!v:lua.get_statusline()'
