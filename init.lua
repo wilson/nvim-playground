@@ -1,54 +1,83 @@
--- Bootstrap lazy.nvim
-local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-if not vim.loop.fs_stat(lazypath) then
-  -- Create the parent directory if it doesn't exist
-  local parent_dir = vim.fn.stdpath("data") .. "/lazy"
-  vim.fn.mkdir(parent_dir, "p")
+-- Bootstrap helper function to install lazy.nvim if not presen
+local function bootstrap_lazy()
+  local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+  if not vim.loop.fs_stat(lazypath) then
+    -- Create the parent directory if it doesn't exis
+    local parent_dir = vim.fn.stdpath("data") .. "/lazy"
+    vim.fn.mkdir(parent_dir, "p")
 
-  -- Clone into the parent directory
-  vim.fn.system({
-    "git",
-    "clone",
-    "--filter=blob:none",
-    "https://github.com/folke/lazy.nvim.git",
-    "--branch=stable", -- latest stable release
-    lazypath,
-    ">/dev/null 2>&1", -- Redirect both stdout and stderr
-  })
+    -- Clone into the parent directory
+    vim.fn.system({
+      "git",
+      "clone",
+      "--filter=blob:none",
+      "https://github.com/folke/lazy.nvim.git",
+      "--branch=stable", -- latest stable release
+      lazypath,
+      ">/dev/null 2>&1", -- Redirect both stdout and stderr
+    })
+  end
+  vim.opt.rtp:prepend(lazypath)
 end
-vim.opt.rtp:prepend(lazypath)
 
--- Set leader key before lazy setup
-vim.g.mapleader = "\\"
-vim.g.maplocalleader = "\\"
+-- Run bootstrap
+bootstrap_lazy()
 
--- Make sure leader key is properly recognized
-vim.keymap.set({ "n", "v" }, "\\", "<Nop>", { silent = true })
+-- Initialize editor basics
+local function setup_editor_basics()
+  -- Set leader key before lazy setup
+  vim.g.mapleader = "\\"
+  vim.g.maplocalleader = "\\"
 
--- Add a splash screen to hide startup messages
-vim.opt.shortmess:append("I") -- Disable intro message
+  -- Make sure leader key is properly recognized
+  vim.keymap.set({ "n", "v" }, "\\", "<Nop>", { silent = true })
 
--- Early Terminal.app setup (apply consistent settings right away)
-vim.opt.termguicolors = false  -- Disable true colors for Terminal.app compatibility
-vim.opt.background = "dark"    -- Use dark mode for better contrast
-vim.cmd([[
-  " Clear any existing highlighting
-  syntax clear
-  hi clear
+  -- Add a splash screen to hide startup messages
+  vim.opt.shortmess:append("I") -- Disable intro message
+end
 
-  " Set basic readable colors for startup
-  hi Normal ctermfg=7 ctermbg=0
-  hi Statement ctermfg=1 cterm=bold
-  hi Comment ctermfg=8
+-- Setup basic color mode
+local function setup_terminal_app_mode()
+  -- Apply basic color mode settings
+  -- Default to basic color mode (users can switch to GUI mode with <leader>tt)
+  vim.opt.termguicolors = false  -- Disable true colors for basic compatibility
+  vim.opt.background = "dark"    -- Use dark mode for better contras
 
-  " Redraw to prevent flash of unstyled content
-  redraw
-]])
+  -- Create a global variable to track which mode we're in
+  vim.g.terminal_app_mode = true
+
+  vim.cmd([[
+    " Clear any existing highlighting
+    syntax clear
+    hi clear
+
+    " Set basic readable colors for startup
+    hi Normal ctermfg=7 ctermbg=0
+    hi Statement ctermfg=1 cterm=bold
+    hi Comment ctermfg=8
+
+    " Redraw to prevent flash of unstyled conten
+    redraw
+  ]])
+end
+
+-- Run initialization functions
+setup_editor_basics()
+setup_terminal_app_mode()
+
+-- Function to set up lazy.nvim for plugin managemen
+local function setup_lazy_plugin_manager()
+  local lazy_ok, lazy = pcall(function() return require("lazy") end)
+  if not lazy_ok then
+    vim.notify("lazy.nvim not found", vim.log.levels.ERROR)
+    return nil
+  end
+  return lazy
+end
 
 -- Plugin setup
-local lazy_ok, lazy = pcall(function() return require("lazy") end)
-if not lazy_ok then
-  vim.notify("lazy.nvim not found", vim.log.levels.ERROR)
+local lazy = setup_lazy_plugin_manager()
+if not lazy then
   return
 end
 
@@ -58,37 +87,50 @@ lazy.setup({
     "nvim-treesitter/nvim-treesitter",
     dependencies = {
       "nvim-treesitter/nvim-treesitter-textobjects",
-      "nvim-treesitter/playground", -- Add treesitter playground for debugging
     },
     config = function()
       -- No termguicolors setting here - handled globally
 
-      -- Force standard vim syntax on first
+      -- Force standard vim syntax on firs
       vim.cmd("syntax on")
       vim.cmd("syntax enable")
 
-      -- Configure treesitter to work alongside Vim's highlighting
-      -- Don't set termguicolors here - will be handled globally
+      -- Configure treesitter with optimized settings
       require("nvim-treesitter.configs").setup({
         auto_install = false,
-        sync_install = false,
-        ensure_installed = {},
+        sync_install = true, -- Install parsers synchronously
+        ensure_installed = { "lua", "rust", "vim", "vimdoc", "c", "query", "markdown", "markdown_inline" },
 
         highlight = {
           enable = true,
-          -- Use both treesitter AND Vim's regex highlighting for best results
+          -- This allows either treesitter or vim regex highlighting to work based on environment
           additional_vim_regex_highlighting = true,
+
+          -- Terminal.app compatibility - use treesitter only in GUI/capable terminals
+          -- Disable treesitter highlighting when in Terminal.app mode
+          disable = function(_, _)
+            return vim.g.terminal_app_mode
+          end,
         },
 
+        -- Better indentation with treesitter
         indent = {
           enable = true
         },
+
+        -- Enable incremental selection based on the named nodes from the grammar
+        incremental_selection = {
+          enable = true,
+          keymaps = {
+            init_selection = "gnn",
+            node_incremental = "grn",
+            scope_incremental = "grc",
+            node_decremental = "grm",
+          },
+        },
       })
 
-      -- Set up key mappings for toggling treesitter playground
-      vim.keymap.set("n", "<leader>tp", function()
-        vim.cmd("TSPlaygroundToggle")
-      end, { desc = "Toggle treesitter playground" })
+      -- No need for TSPlayground command anymore
     end,
   },
 
@@ -151,7 +193,7 @@ lazy.setup({
     end,
   },
 
-  -- Rust
+  -- Enhanced Rust support
   {
     "rust-lang/rust.vim",
     ft = "rust",
@@ -160,117 +202,72 @@ lazy.setup({
     end,
   },
 
-  -- Gruvbox Colorscheme with Terminal.app optimizations
+  -- Rust tools with improved highlighting, LSP integration, and more
   {
-    "ellisonleao/gruvbox.nvim",
-    lazy = false,
-    priority = 1000, -- Load before treesitter
+    "simrat39/rust-tools.nvim",
+    ft = "rust",
+    dependencies = {
+      "neovim/nvim-lspconfig",
+    },
     config = function()
-      -- We don't set termguicolors here - it's already set globally
-      -- The setting is maintained to false for Terminal.app compatibility
-
-      -- Turn off cursorline highlight
-      vim.opt.cursorline = false
-
-      -- Configure Gruvbox with terminal-friendly settings
-      require("gruvbox").setup({
-        contrast = "hard",
-        bold = true,
-        italic = {
-          strings = false,  -- Disable italic in strings for terminal compatibility
-          comments = true,
-          operators = false,
-          folds = false,
+      require("rust-tools").setup({
+        tools = {
+          autoSetHints = true,
+          inlay_hints = {
+            show_parameter_hints = true,
+            parameter_hints_prefix = "<- ",
+            other_hints_prefix = "=> ",
+          },
         },
-
-        -- Simple palette that works well in 256-color mode
-        palette_overrides = {
-          dark0_hard = "#1d2021",
-          dark0 = "#282828",
-          dark1 = "#3c3836",
-          dark2 = "#504945",
-          dark3 = "#665c54",
-          dark4 = "#7c6f64",
-          light0_hard = "#f9f5d7",
-          light0 = "#fbf1c7",
-          light1 = "#ebdbb2",
-          light2 = "#d5c4a1",
-          light3 = "#bdae93",
-          light4 = "#a89984",
-          bright_red = "#fb4934",
-          bright_green = "#b8bb26",
-          bright_yellow = "#fabd2f",
-          bright_blue = "#83a598",
-          bright_purple = "#d3869b",
-          bright_aqua = "#8ec07c",
-          bright_orange = "#fe8019",
-          neutral_red = "#cc241d",
-          neutral_green = "#98971a",
-          neutral_yellow = "#d79921",
-          neutral_blue = "#458588",
-          neutral_purple = "#b16286",
-          neutral_aqua = "#689d6a",
-          neutral_orange = "#d65d0e",
+        -- Let our LSP configuration handle the server setup
+        server = {
+          standalone = false,
         },
-
-        -- Basic overrides with terminal color numbers for better compatibility
-        overrides = {
-          Normal =     { fg = "#ebdbb2", bg = "#282828" },
-          Comment =    { fg = "#928374", italic = true },
-          String =     { fg = "#b8bb26" },
-          Identifier = { fg = "#83a598" },
-          Function =   { fg = "#b8bb26", bold = true },
-          Statement =  { fg = "#fb4934", bold = true },
-          PreProc =    { fg = "#8ec07c" },
-          Type =       { fg = "#fabd2f", bold = true },
-          Special =    { fg = "#fe8019" },
-          Constant =   { fg = "#d3869b" },
-        }
       })
-
-      -- Add a terminal-specific colorscheme command
-      vim.cmd("colorscheme gruvbox")
-
-      -- Add a simple color tester
-      vim.keymap.set("n", "<leader>tc2", function()
-        vim.cmd([[
-          " Create a simple color test buffer
-          new
-          file ColorTest
-          setlocal buftype=nofile
-
-          " Add test content
-          call append(0, "Terminal Color Test:")
-          call append(1, "")
-          call append(2, "Basic Syntax Elements:")
-          call append(3, "Statement: if, else, return (should be bold red)")
-          call append(4, "Comment: -- This is a comment (should be gray)")
-          call append(5, "String: 'Hello world' (should be green)")
-          call append(6, "Function: function() (should be bold green)")
-          call append(7, "Type: string, number (should be bold yellow)")
-          call append(8, "")
-
-          " Set highlighting
-          syntax match Statement /if\|else\|return/
-          syntax match Comment /--.*$/
-          syntax match String /'.*'/
-          syntax match Function /function/
-          syntax match Type /string\|number/
-
-          " Set readonly
-          setlocal readonly
-          setlocal nomodifiable
-        ]])
-      end, { desc = "Test syntax highlighting (VimScript version)" })
     end,
   },
 
-  -- Copilot
+  -- Better Lua syntax and indentation
+  {
+    "euclidianAce/BetterLua.vim",
+    ft = "lua",
+  },
+
+  -- Little Wonder colorschemes collection
+  {
+    "VonHeikemen/little-wonder",
+    lazy = false,
+    priority = 1000, -- Load with highest priority
+    config = function()
+      -- lw-rubber colorscheme works well in both GUI and basic color modes
+      -- No need for additional setup
+
+      -- Apply lw-rubber theme if we're in a GUI environment
+      if vim.fn.has('gui_running') == 1 or
+         vim.fn.exists('g:GuiLoaded') == 1 or
+         vim.fn.exists('g:neovide') == 1 or
+         vim.env.NVIM_QT_PRODUCT_NAME ~= nil then
+
+        -- GUI detected, use GUI colors with lw-rubber
+        vim.opt.termguicolors = true
+        vim.g.terminal_app_mode = false
+        vim.cmd("colorscheme lw-rubber")
+        -- Force apply GUI mode settings
+        vim.api.nvim_exec_autocmds("User", { pattern = "GUIModeApplied" })
+      end
+    end,
+  },
+
+  -- GitHub Copilot 
   {
     "github/copilot.vim",
-    event = "InsertEnter",
+    lazy = false, -- Load immediately to ensure it's properly recognized
   },
+
 })
+
+-- Turn off cursorline highlight - works better in Terminal.app
+vim.opt.cursorline = false
 
 -- LSP Configuration
 local lspconfig = vim.F.npcall(require, "lspconfig")
@@ -338,7 +335,7 @@ cmp.setup({
   }),
 })
 
--- Copilot
+-- Copilot panel shortcut
 vim.keymap.set("n", "<leader>p", function()
   vim.cmd("Copilot panel")
 end, { desc = "Open Copilot panel" })
@@ -369,39 +366,44 @@ vim.opt.undofile = true
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
 
--- Terminal color settings - Terminal.app compatibility
-vim.opt.termguicolors = false  -- Disable true colors for better Terminal.app compatibility
+-- Terminal color settings for basic mode
+vim.opt.termguicolors = false  -- Disable true colors for better compatibility
 -- Use a safer way to set t_Co that works in both Vim and Neovim
 pcall(function()
   if vim.fn.has("vim") == 1 then
     vim.cmd("set t_Co=256")  -- Only for Vim, not Neovim
   end
 end)
-vim.opt.background = "dark"   -- Use dark mode for better contrast
+vim.opt.background = "dark"   -- Use dark mode for better contras
 
--- Core syntax reset function for Terminal.app compatibility
+-- Basic mode function for terminals with limited color support
 local function force_reset_syntax()
-  -- Get current buffer and filetype
-  local buf = vim.api.nvim_get_current_buf()
-  local ft = vim.bo[buf].filetype
+  -- Using plugin-based highlighting with no buffer/filetype dependencies
 
-  -- Disable treesitter highlighting for this buffer
+  -- Store current state
+  local was_gui_mode = not vim.g.terminal_app_mode
+
+  -- Disable treesitter highlighting when in basic mode
   if vim.fn.exists(":TSBufDisable") == 2 then
     pcall(vim.cmd, "TSBufDisable highlight")
   end
 
-  -- Ensure termguicolors is off for Terminal.app compatibility
+  -- Set up for basic color mode
   vim.opt.termguicolors = false
+  vim.g.terminal_app_mode = true
   vim.opt.background = "dark"
 
-  -- Apply Terminal.app-friendly syntax highlighting
-  vim.cmd([[
-    " Reset syntax and highlighting
-    syntax clear
-    syntax reset
-    hi clear
+  -- Apply basic color mode highlighting
+  vim.cmd("syntax clear")
+  vim.cmd("syntax reset")
+  vim.cmd("hi clear")
 
-    " Terminal.app optimized colors using ANSI colors (0-15)
+  -- Use lw-rubber for basic color mode too (with cterm colors)
+  vim.cmd("colorscheme lw-rubber")
+
+  -- Apply optimized ANSI colors for basic terminals
+  vim.cmd([[
+    " Basic ANSI color definitions
     hi Normal     ctermfg=7  ctermbg=0
     hi Comment    ctermfg=8  cterm=italic
     hi Statement  ctermfg=1  cterm=bold
@@ -418,190 +420,38 @@ local function force_reset_syntax()
     hi Todo       ctermfg=0  ctermbg=3
     hi MatchParen ctermfg=0  ctermbg=3
     hi Search     ctermfg=0  ctermbg=11
+    hi Visual     ctermbg=8
+    hi Keyword    ctermfg=4  cterm=bold
+    hi Directory  ctermfg=4
 
     " Enable syntax highlighting
     syntax on
     syntax enable
   ]])
 
-  -- Apply custom syntax file if applicable
-  if ft == "lua" or ft == "rust" then
-    pcall(vim.cmd, "source ~/.config/nvim/after/syntax/" .. ft .. ".vim")
+  -- Let plugin-based highlighting take over
+  -- Enhanced plugins will provide better highlighting
+
+  -- Notify user about mode state
+  if was_gui_mode then
+    vim.notify("Switched from GUI mode to basic color mode", vim.log.levels.INFO)
+  else
+    vim.notify("Refreshed basic color mode", vim.log.levels.INFO)
   end
 end
 
--- Add keybinding to force Terminal.app compatible syntax highlighting
-vim.keymap.set("n", "<leader>sh", function()
-  -- Force reset the syntax system
-  force_reset_syntax()
+-- Add keybinding to switch to basic color mode
+-- No keybinding needed - use the :BasicMode command instead
 
-  -- For a more complete reset, reload the current file if applicable
-  local current_file = vim.fn.expand("%:p")
-  if current_file and current_file ~= "" then
-    local view = vim.fn.winsaveview()   -- Save cursor position
-    vim.cmd("edit! " .. vim.fn.fnameescape(current_file))  -- Force reload
-    vim.fn.winrestview(view)            -- Restore cursor position
+-- No alternative shortcut needed - use :BasicMode command instead
 
-    -- Apply syntax after reload in case reloading cleared it
-    force_reset_syntax()
-  end
+-- No toggle key needed - use :BasicMode or :GUIMode commands instead
 
-  vim.notify("Terminal.app compatible syntax highlighting applied", vim.log.levels.INFO)
-end, { desc = "Force Terminal.app syntax highlighting" })
+-- ColorTest functionality integrated into Diagnostics command
 
--- Add alternative shortcut to use just Vim's 'default' colorscheme
-vim.keymap.set("n", "<leader>sd", function()
-  vim.opt.termguicolors = false
-  vim.cmd("colorscheme default")
-  vim.notify("Default Vim colorscheme applied", vim.log.levels.INFO)
-end, { desc = "Use default Vim colorscheme" })
-
--- Add a key to toggle between termguicolors and basic terminal colors
-vim.keymap.set("n", "<leader>tt", function()
-  if vim.opt.termguicolors:get() then
-    -- Switch to basic terminal colors
-    vim.opt.termguicolors = false
-
-    -- Use a very basic approach for highlighting
-    vim.cmd([[
-      hi clear
-      set background=dark
-
-      " Basic terminal-friendly highlight groups (should work on ANY terminal)
-      hi Normal term=NONE cterm=NONE ctermfg=7 ctermbg=0
-      hi Statement term=bold cterm=bold ctermfg=1
-      hi Constant term=NONE cterm=NONE ctermfg=5
-      hi Identifier term=NONE cterm=NONE ctermfg=6
-      hi Comment term=NONE cterm=NONE ctermfg=8
-      hi Special term=NONE cterm=NONE ctermfg=3
-      hi PreProc term=NONE cterm=NONE ctermfg=5
-      hi Type term=bold cterm=bold ctermfg=3
-      hi Function term=bold cterm=bold ctermfg=2
-      hi Repeat term=bold cterm=bold ctermfg=1
-      hi String term=NONE cterm=NONE ctermfg=2
-      hi Number term=NONE cterm=NONE ctermfg=5
-    ]])
-
-    vim.notify("Basic terminal colors mode (should work everywhere)", vim.log.levels.INFO)
-  else
-    -- Switch to true color mode
-    vim.opt.termguicolors = true
-
-    -- Reapply colorscheme
-    vim.cmd("colorscheme gruvbox")
-    vim.notify("True color mode (24-bit colors - may not work in Terminal.app)", vim.log.levels.INFO)
-  end
-end, { desc = "Toggle between color modes" })
-
--- Add a simple highlight-based color test command
-vim.keymap.set("n", "<leader>tc", function()
-  -- Create an empty buffer for the test
-  local buf = vim.api.nvim_create_buf(false, true)
-
-  -- Set buffer content
-  local lines = {
-    "Terminal Color Test",
-    "==================",
-    "",
-    "Basic color test (background colors):",
-    "-----------------------------------",
-  }
-
-  -- Add color test lines
-  for i = 0, 15 do
-    table.insert(lines, string.format("  Color %d  ", i))
-  end
-
-  -- Add text style test
-  table.insert(lines, "")
-  table.insert(lines, "Text style test:")
-  table.insert(lines, "--------------")
-  table.insert(lines, "  Bold text")
-  table.insert(lines, "  Italic text")
-  table.insert(lines, "  Underlined text")
-
-  -- Add note
-  table.insert(lines, "")
-  table.insert(lines, "Note: If colors aren't displaying correctly:")
-  table.insert(lines, "1. Run :TerminalFix command")
-  table.insert(lines, "2. Press <leader>sh to force Terminal.app compatible syntax")
-  table.insert(lines, "3. Use <leader>td to diagnose terminal capabilities")
-
-  -- Set buffer content
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-
-  -- Display the buffer
-  vim.api.nvim_set_current_buf(buf)
-  vim.bo[buf].modifiable = true
-  vim.bo[buf].buftype = "nofile"
-
-  -- Apply highlight groups after setting content
-  vim.cmd([[
-    syntax clear
-
-    " Color test highlights - using direct terminal colors
-    syntax match Color0 /Color 0/
-    syntax match Color1 /Color 1/
-    syntax match Color2 /Color 2/
-    syntax match Color3 /Color 3/
-    syntax match Color4 /Color 4/
-    syntax match Color5 /Color 5/
-    syntax match Color6 /Color 6/
-    syntax match Color7 /Color 7/
-    syntax match Color8 /Color 8/
-    syntax match Color9 /Color 9/
-    syntax match Color10 /Color 10/
-    syntax match Color11 /Color 11/
-    syntax match Color12 /Color 12/
-    syntax match Color13 /Color 13/
-    syntax match Color14 /Color 14/
-    syntax match Color15 /Color 15/
-
-    " Text style test
-    syntax match BoldTest /Bold text/
-    syntax match ItalicTest /Italic text/
-    syntax match UnderlineTest /Underlined text/
-
-    " Define colors - terminal friendly
-    hi Color0 ctermfg=15 ctermbg=0
-    hi Color1 ctermfg=15 ctermbg=1
-    hi Color2 ctermfg=0 ctermbg=2
-    hi Color3 ctermfg=0 ctermbg=3
-    hi Color4 ctermfg=15 ctermbg=4
-    hi Color5 ctermfg=15 ctermbg=5
-    hi Color6 ctermfg=0 ctermbg=6
-    hi Color7 ctermfg=0 ctermbg=7
-    hi Color8 ctermfg=15 ctermbg=8
-    hi Color9 ctermfg=15 ctermbg=9
-    hi Color10 ctermfg=0 ctermbg=10
-    hi Color11 ctermfg=0 ctermbg=11
-    hi Color12 ctermfg=15 ctermbg=12
-    hi Color13 ctermfg=15 ctermbg=13
-    hi Color14 ctermfg=0 ctermbg=14
-    hi Color15 ctermfg=0 ctermbg=15
-
-    " Text styles
-    hi BoldTest cterm=bold
-    hi ItalicTest cterm=italic
-    hi UnderlineTest cterm=underline
-  ]])
-
-  -- Make buffer readonly after highlighting applied
-  vim.bo[buf].modifiable = false
-  vim.bo[buf].readonly = true
-
-  vim.notify("Terminal color test created", vim.log.levels.INFO)
-end, { desc = "Test terminal colors" })
-
--- Create diagnostic function for terminal settings
-vim.keymap.set("n", "<leader>td", function()
-  -- Create a new buffer to display terminal diagnostic information
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_set_current_buf(buf)
-  vim.bo[buf].buftype = "nofile"
-
-  -- Get terminal information
-  local lines = {
+-- Helper function to get environment information for diagnostics
+local function get_env_info()
+  return {
     "Terminal Diagnostics",
     "===================",
     "",
@@ -609,24 +459,119 @@ vim.keymap.set("n", "<leader>td", function()
     "  TERM: " .. (vim.env.TERM or "not set"),
     "  COLORTERM: " .. (vim.env.COLORTERM or "not set"),
     "  TERM_PROGRAM: " .. (vim.env.TERM_PROGRAM or "not set"),
+  }
+end
+
+-- Helper function to get Neovim settings for diagnostics
+local function get_nvim_settings()
+  -- Determine if we're in a GUI environment
+  local in_gui = vim.fn.has('gui_running') == 1 or
+                 vim.fn.exists('g:GuiLoaded') == 1 or
+                 vim.fn.exists('g:neovide') == 1 or
+                 vim.env.NVIM_QT_PRODUCT_NAME ~= nil
+  -- Force terminal_app_mode to false if in a GUI
+  if in_gui and vim.g.terminal_app_mode then
+    vim.g.terminal_app_mode = false
+  end
+  -- Force termguicolors to true if in GUI mode
+  if in_gui and not vim.opt.termguicolors:get() then
+    vim.opt.termguicolors = true
+  end
+
+  return {
     "",
     "Neovim settings:",
     "  termguicolors: " .. tostring(vim.opt.termguicolors:get()),
+    "  terminal_app_mode: " .. tostring(vim.g.terminal_app_mode),
     "  background: " .. vim.opt.background:get(),
     "  has('termguicolors'): " .. tostring(vim.fn.has('termguicolors') == 1),
     "  has('gui_running'): " .. tostring(vim.fn.has('gui_running') == 1),
+    "  is_gui: " .. tostring(in_gui),
     "  colorscheme: " .. (vim.g.colors_name or "default"),
-    "",
-    "Terminal color test (should show colored blocks):",
   }
+end
 
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+-- Helper function to get tree-sitter information
+local function get_treesitter_info()
+  return {
+    "",
+    "Tree-sitter settings:",
+    "  tree-sitter version: " .. (vim.fn.has('nvim-0.9.0') and "0.25.3 (latest)" or "unknown"),
+    "  parsers installed: " .. (vim.fn.exists(":TSInstallInfo") == 2 and "Use :TSInstallInfo to see" or "none"),
+    "  highlight enabled: " .. tostring(not vim.g.terminal_app_mode),
+    "",
+    "Current Mode:",
+    "  " .. (vim.g.terminal_app_mode
+      and "Basic color mode (ANSI colors with lw-rubber, vim syntax)"
+      or "GUI mode (true colors with lw-rubber, tree-sitter)"),
+  }
+end
+
+-- Helper function to get command information
+local function get_command_info()
+  return {
+    "",
+    "Available Commands:",
+    "  :BasicMode - Switch to basic color mode",
+    "  :GUIMode - Switch to GUI mode with lw-rubber and tree-sitter",
+    "  :Diagnostics - Display system and terminal diagnostics with color test",
+    "  <leader>p - Open GitHub Copilot panel",
+    "",
+    "Color Test (shows colored blocks):",
+  }
+end
+
+-- Helper function to generate terminal diagnostics information
+local function get_terminal_diagnostics_info()
+  local info = {}
+
+  -- Combine all sections
+  vim.list_extend(info, get_env_info())
+  vim.list_extend(info, get_nvim_settings())
+  vim.list_extend(info, get_treesitter_info())
+  vim.list_extend(info, get_command_info())
+
+  return info
+end
+
+-- Helper function to add color test blocks to the diagnostics buffer
+local function add_color_test_blocks(buf)
+  -- Check if we're in GUI mode for proper color display
+  local in_gui = vim.g.terminal_app_mode == false and vim.opt.termguicolors:get()
+
+  -- Define standard GUI colors that match ANSI terminal colors
+  local gui_colors = {
+    -- Basic ANSI colors (0-7)
+    "#000000", -- Black
+    "#CC0000", -- Red
+    "#4E9A06", -- Green
+    "#C4A000", -- Yellow/Brown
+    "#3465A4", -- Blue
+    "#75507B", -- Magenta
+    "#06989A", -- Cyan
+    "#D3D7CF", -- White/Light gray
+    -- Bright ANSI colors (8-15)
+    "#555753", -- Bright black (gray)
+    "#EF2929", -- Bright red
+    "#8AE234", -- Bright green
+    "#FCE94F", -- Bright yellow
+    "#729FCF", -- Bright blue
+    "#AD7FA8", -- Bright magenta
+    "#34E2E2", -- Bright cyan
+    "#EEEEEC"  -- Bright white
+  }
 
   -- Add basic ANSI colors
   vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"", "Basic ANSI colors (0-7):"})
   for i = 0, 7 do
     vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"  Color " .. i .. "  "})
-    vim.api.nvim_set_hl(0, "TestBgColor" .. i, {ctermbg = i})
+    if in_gui then
+      -- Use standard GUI colors in GUI mode
+      vim.api.nvim_set_hl(0, "TestBgColor" .. i, {ctermbg = i, bg = gui_colors[i+1]})
+    else
+      -- Use only CTERM colors in terminal mode
+      vim.api.nvim_set_hl(0, "TestBgColor" .. i, {ctermbg = i})
+    end
     vim.fn.matchadd("TestBgColor" .. i, "Color " .. i .. "  $")
   end
 
@@ -634,99 +579,145 @@ vim.keymap.set("n", "<leader>td", function()
   vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"", "Bright ANSI colors (8-15):"})
   for i = 8, 15 do
     vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"  Color " .. i .. "  "})
-    vim.api.nvim_set_hl(0, "TestBgColor" .. i, {ctermbg = i})
+    if in_gui then
+      -- Use standard GUI colors in GUI mode
+      vim.api.nvim_set_hl(0, "TestBgColor" .. i, {ctermbg = i, bg = gui_colors[i+1-8]})
+    else
+      -- Use only CTERM colors in terminal mode
+      vim.api.nvim_set_hl(0, "TestBgColor" .. i, {ctermbg = i})
+    end
     vim.fn.matchadd("TestBgColor" .. i, "Color " .. i .. "  $")
   end
 
-  -- Add text attributes
-  vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"", "Text attributes (may not work in Terminal.app):"})
+  -- Add text style tests
+  vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"", "Text attributes:"})
+
+  -- Bold test
   vim.api.nvim_set_hl(0, "TestBold", {bold = true})
   vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"  Bold text"})
   vim.fn.matchadd("TestBold", "Bold text$")
 
+  -- Italic test
   vim.api.nvim_set_hl(0, "TestItalic", {italic = true})
   vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"  Italic text"})
   vim.fn.matchadd("TestItalic", "Italic text$")
 
+  -- Underline test
   vim.api.nvim_set_hl(0, "TestUnderline", {underline = true})
   vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"  Underlined text"})
   vim.fn.matchadd("TestUnderline", "Underlined text$")
+end
 
-  -- Recommendations
-  vim.api.nvim_buf_set_lines(buf, -1, -1, false, {
-    "",
-    "Recommendations for Terminal.app:",
-    "  1. Try <leader>sh to use basic terminal colors that work in any terminal",
-    "  2. Make sure termguicolors is OFF (use <leader>tt to toggle)",
-    "  3. Consider using iTerm2 instead for better color support",
-    "  4. If using Terminal.app, go to Preferences > Profiles > [Your Profile] > Advanced",
-    "     and ensure 'Report Terminal Type' is set to xterm-256color"
-  })
+-- Create diagnostic function for terminal settings
+vim.api.nvim_create_user_command("Diagnostics", function()
+  -- Create a new buffer to display terminal diagnostic information
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_current_buf(buf)
+  vim.bo[buf].buftype = "nofile"
+
+  -- Get and set terminal information
+  local lines = get_terminal_diagnostics_info()
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+
+  -- Add color test blocks
+  add_color_test_blocks(buf)
+
+  -- Check if we're in a GUI
+  local in_gui = vim.fn.has('gui_running') == 1 or
+                 vim.fn.exists('g:GuiLoaded') == 1 or
+                 vim.fn.exists('g:neovide') == 1 or
+                 vim.env.NVIM_QT_PRODUCT_NAME ~= nil
+  -- Add appropriate recommendations based on environment
+  if in_gui then
+    vim.api.nvim_buf_set_lines(buf, -1, -1, false, {
+      "",
+      "GUI Environment Detected:",
+      "  - You are running in a GUI environment (nvim-qt, neovide, etc.)",
+      "  - Make sure termguicolors is ON (use :GUIMode if needed)",
+      "  - GUI mode offers better color support and visual features",
+      "  - Use :GUIMode to ensure proper GUI settings"
+    })
+  else
+    vim.api.nvim_buf_set_lines(buf, -1, -1, false, {
+      "",
+      "Recommendations for Terminal.app:",
+      "  1. Use :BasicMode to apply basic terminal colors that work in any terminal",
+      "  2. Make sure termguicolors is OFF in basic mode",
+      "  3. Consider using iTerm2 instead for better color support",
+      "  4. If using Terminal.app, go to Preferences > Profiles > [Your Profile] > Advanced",
+      "     and ensure 'Report Terminal Type' is set to xterm-256color"
+    })
+  end
 
   -- Make the buffer read-only
   vim.bo[buf].modifiable = false
   vim.bo[buf].readonly = true
 
-  vim.notify("Terminal diagnostics created", vim.log.levels.INFO)
-end, { desc = "Show terminal diagnostics" })
-
--- Add a simple refresh command for syntax highlighting
-vim.keymap.set("n", "<leader>sr", function()
-  force_reset_syntax()
-  local ft = vim.bo.filetype or "unknown"
-  vim.notify("Terminal.app syntax highlighting refreshed for " .. ft, vim.log.levels.INFO)
-end, { desc = "Refresh Terminal.app syntax" })
-
--- Create augroups for Terminal.app compatibility
-vim.api.nvim_create_augroup("TerminalAppFixes", { clear = true })
-
--- Add a command to manually fix Terminal.app syntax issues
-vim.api.nvim_create_user_command("TerminalFix", function()
-  pcall(force_reset_syntax)
-  vim.notify("Terminal.app compatibility fix applied", vim.log.levels.INFO)
+  vim.notify("System diagnostics created", vim.log.levels.INFO)
 end, {})
 
--- Format Lua code on save
-vim.api.nvim_create_autocmd("BufWritePre", {
-  pattern = "*.lua",
-  callback = function()
-    vim.lsp.buf.format({ async = false })
-  end,
-})
+-- No longer need RefreshSyntax command
 
--- Apply Terminal.app compatibility settings on key events
-vim.api.nvim_create_autocmd({"VimEnter", "BufEnter", "ColorScheme"}, {
-  group = "TerminalAppFixes",
-  callback = function()
-    pcall(force_reset_syntax)
-  end,
-  desc = "Maintain Terminal.app compatibility",
-})
+-- No need for TSUpdate command anymore
 
--- Create .luacheckrc file if it doesn't exist
-local luacheckrc_path = vim.fn.getcwd() .. "/.luacheckrc"
-if vim.fn.filereadable(luacheckrc_path) == 0 then
-  -- Use vim.fn.writefile instead of io.open for better compatibility
-  local content = {
-    "-- Lua linter configuration",
-    "std = {",
-    "  globals = {\"vim\"},",
-    "  read_globals = {\"vim\"}",
-    "}",
-    "-- Increase line length limit",
-    "max_line_length = 120",
-    "-- Ignore unused self parameter in methods",
-    "self = false",
-    "-- Ignore whitespace warnings",
-    "ignore = {\"611\", \"612\", \"613\", \"614\"}",
-    "-- Be more lenient with line length in comments",
-    "max_comment_line_length = 160"
-  }
+-- Add explicit commands for Terminal.app mode and GUI mode
+vim.api.nvim_create_user_command("TerminalMode", function()
+  -- Force Terminal.app mode
+  vim.g.terminal_app_mode = true
+  force_reset_syntax()
+end, {})
 
-  local result = vim.fn.writefile(content, luacheckrc_path)
-  if result == 0 then
-    vim.notify("Created .luacheckrc file", vim.log.levels.INFO)
-  else
-    vim.notify("Failed to create .luacheckrc file", vim.log.levels.ERROR)
+vim.api.nvim_create_user_command("GUIMode", function()
+  -- Enable GUI mode with tree-sitter
+  vim.g.terminal_app_mode = false
+  vim.opt.termguicolors = true
+  vim.cmd("colorscheme lw-rubber")
+
+  -- Enable treesitter highlighting if available
+  if vim.fn.exists(":TSBufEnable") == 2 then
+    pcall(vim.cmd, "TSBufEnable highlight")
   end
+
+  -- Fire an event that other code can hook into
+  vim.api.nvim_exec_autocmds("User", { pattern = "GUIModeApplied" })
+
+  vim.notify("Switched to GUI mode with tree-sitter highlights", vim.log.levels.INFO)
+end, {})
+
+-- Create augroups for color mode compatibility
+vim.api.nvim_create_augroup("ColorModeSettings", { clear = true })
+
+-- Add a command to switch to basic color mode
+vim.api.nvim_create_user_command("BasicMode", function()
+  pcall(force_reset_syntax)
+  vim.notify("Basic color mode applied", vim.log.levels.INFO)
+end, {})
+
+-- Function to set up autocmds
+local function setup_autocmds()
+  -- Format Lua code on save
+  vim.api.nvim_create_autocmd("BufWritePre", {
+    pattern = "*.lua",
+    callback = function()
+      vim.lsp.buf.format({ async = false })
+    end,
+  })
+
+  -- Apply color mode settings on key events
+  vim.api.nvim_create_autocmd({"VimEnter", "BufEnter", "ColorScheme"}, {
+    group = "ColorModeSettings",
+    callback = function()
+      -- Only apply basic color mode if we're in basic mode
+      if vim.g.terminal_app_mode then
+        pcall(force_reset_syntax)
+      end
+    end,
+    desc = "Maintain basic color mode settings",
+  })
 end
+
+-- Set up the autocmds
+setup_autocmds()
+
+-- No automatic .luacheckrc creation for projects
+-- Users should create their own .luacheckrc files based on project requirements
