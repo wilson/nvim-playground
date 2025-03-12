@@ -44,7 +44,9 @@ lazy.setup({
       "nvim-treesitter/nvim-treesitter-textobjects",
     },
     config = function()
-      require("nvim-treesitter.configs").setup({
+      local ts_ok, ts_configs = pcall(function() return require("nvim-treesitter.configs") end)
+      if ts_ok then
+        ts_configs.setup({
         ensure_installed = { "lua", "vim", "vimdoc", "rust" },
         highlight = { 
           enable = true,
@@ -63,7 +65,8 @@ lazy.setup({
             },
           },
         },
-      })
+        })
+      end
     end,
   },
 
@@ -81,31 +84,43 @@ lazy.setup({
       {
         "williamboman/mason.nvim",
         config = function()
-          require("mason").setup()
+          local mason_ok, mason = pcall(function() return require("mason") end)
+          if mason_ok then
+            mason.setup()
+          end
         end,
       },
       {
         "williamboman/mason-lspconfig.nvim",
         config = function()
-          require("mason-lspconfig").setup({
-            ensure_installed = { "lua_ls", "rust_analyzer", "luau_lsp" },
-            automatic_installation = true,
-          })
+          local mason_lspconfig_ok, mason_lspconfig = pcall(function() return require("mason-lspconfig") end)
+          if mason_lspconfig_ok then
+            mason_lspconfig.setup({
+              ensure_installed = { "lua_ls", "rust_analyzer", "luau_lsp" },
+              automatic_installation = true,
+            })
+          end
         end,
       },
       -- Linter integration
       {
         "mfussenegger/nvim-lint",
         config = function()
-          require("lint").linters_by_ft = {
-            lua = {"luacheck"},
-          }
-          -- Run linter on save
-          vim.api.nvim_create_autocmd({ "BufWritePost" }, {
-            callback = function()
-              require("lint").try_lint()
-            end,
-          })
+          local lint_ok, lint = pcall(function() return require("lint") end)
+          if lint_ok then
+            lint.linters_by_ft = {
+              lua = {"luacheck"},
+            }
+            -- Run linter on save
+            vim.api.nvim_create_autocmd({ "BufWritePost" }, {
+              callback = function()
+                local lint_mod = vim.F.npcall(require, "lint")
+                if lint_mod then
+                  lint_mod.try_lint()
+                end
+              end,
+            })
+          end
         end,
       },
     },
@@ -129,7 +144,9 @@ lazy.setup({
     lazy = false,
     priority = 1000,
     config = function()
-      require("tokyonight").setup({
+      local tokyonight_ok, tokyonight = pcall(function() return require("tokyonight") end)
+      if tokyonight_ok then
+        tokyonight.setup({
         style = "night",
         transparent = true,  -- Use terminal background
         terminal_colors = true,
@@ -150,8 +167,9 @@ lazy.setup({
           highlights.Normal = { bg = colors.bg, fg = colors.fg }
           highlights.NormalFloat = { bg = colors.bg_dark, fg = colors.fg }
         end,
-      })
-      vim.cmd([[colorscheme tokyonight-night]])
+        })
+        vim.cmd([[colorscheme tokyonight-night]])
+      end
     end,
   },
 
