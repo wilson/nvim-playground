@@ -263,3 +263,74 @@ vim.api.nvim_set_hl(0, "StatusLineInfo", { bg = "#1a1b26", fg = "#7dcfff" })
 vim.keymap.set("n", "<leader>w", "<cmd>w<cr>", { desc = "Save" })
 vim.keymap.set("n", "<leader>q", "<cmd>q<cr>", { desc = "Quit" })
 vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
+
+-- Git repository health check
+vim.keymap.set("n", "<leader>gh", function()
+  local health_buffer = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_option(health_buffer, "buftype", "nofile")
+  vim.api.nvim_buf_set_option(health_buffer, "bufhidden", "wipe")
+  vim.api.nvim_buf_set_option(health_buffer, "swapfile", false)
+  vim.api.nvim_buf_set_name(health_buffer, "GitHealth")
+  
+  local width = math.floor(vim.o.columns * 0.8)
+  local height = math.floor(vim.o.lines * 0.8)
+  local row = math.floor((vim.o.lines - height) / 2)
+  local col = math.floor((vim.o.columns - width) / 2)
+  
+  local opts = {
+    relative = "editor",
+    width = width,
+    height = height,
+    row = row,
+    col = col,
+    style = "minimal",
+    border = "rounded",
+  }
+  
+  local win = vim.api.nvim_open_win(health_buffer, true, opts)
+  vim.api.nvim_win_set_option(win, "winblend", 0)
+  
+  local function append_line(line)
+    local lines = vim.split(line, "\n")
+    vim.api.nvim_buf_set_lines(health_buffer, -1, -1, false, lines)
+  end
+  
+  append_line("# Git Repository Health Check")
+  append_line("")
+  append_line("## Checking for corrupted objects...")
+  
+  vim.fn.jobstart("git fsck --full", {
+    on_stdout = function(_, data)
+      if data then
+        for _, line in ipairs(data) do
+          if line ~= "" then
+            append_line("  " .. line)
+          end
+        end
+      end
+    end,
+    on_stderr = function(_, data)
+      if data then
+        for _, line in ipairs(data) do
+          if line ~= "" then
+            append_line("  ERROR: " .. line)
+          end
+        end
+      end
+    end,
+    on_exit = function()
+      append_line("")
+      append_line("## Suggested fixes:")
+      append_line("")
+      append_line("If corrupted objects were found, try these commands:")
+      append_line("```")
+      append_line("# Try to repair the repository")
+      append_line("git gc --aggressive --prune=now")
+      append_line("")
+      append_line("# If that doesn't work, try cloning a fresh copy")
+      append_line("cd ..")
+      append_line("git clone <repository-url> fresh-repo")
+      append_line("```")
+    end
+  })
+end, { desc = "Git repository health check" })
