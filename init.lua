@@ -56,6 +56,22 @@ require("lazy").setup({
       "hrsh7th/cmp-path",
       "L3MON4D3/LuaSnip",
       "saadparwaiz1/cmp_luasnip",
+      -- Mason for managing LSP servers
+      {
+        "williamboman/mason.nvim",
+        config = function()
+          require("mason").setup()
+        end,
+      },
+      {
+        "williamboman/mason-lspconfig.nvim",
+        config = function()
+          require("mason-lspconfig").setup({
+            ensure_installed = { "lua_ls", "rust_analyzer" },
+            automatic_installation = true,
+          })
+        end,
+      },
     },
     config = function()
       -- LSP setup will be defined later
@@ -85,10 +101,20 @@ local capabilities = require("cmp_nvim_lsp").default_capabilities()
 -- Setup common LSP servers
 local servers = { "lua_ls", "rust_analyzer" }
 for _, lsp in ipairs(servers) do
-  lspconfig[lsp].setup({
-    capabilities = capabilities,
-  })
+  -- Only set up the server if it's available
+  local ok, _ = pcall(require, "lspconfig." .. lsp)
+  if ok then
+    lspconfig[lsp].setup({
+      capabilities = capabilities,
+    })
+  end
 end
+
+-- NOTE: To install language servers:
+-- lua_ls: Install with your package manager or Mason.nvim
+--   macOS: brew install lua-language-server
+--   or add "williamboman/mason.nvim" to your plugins
+-- rust_analyzer: Install with rustup component add rust-analyzer
 
 -- LSP keymaps
 vim.keymap.set("n", "gd", vim.lsp.buf.definition, { desc = "Go to definition" })
