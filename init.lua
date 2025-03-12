@@ -1,6 +1,8 @@
 -- Bootstrap lazy.nvim
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not vim.loop.fs_stat(lazypath) then
+  -- Create the parent directory if it doesn't exist
+  vim.fn.mkdir(vim.fn.fnamemodify(lazypath, ":h"), "p")
   -- Redirect output to /dev/null to hide commit hash
   vim.fn.system({
     "git",
