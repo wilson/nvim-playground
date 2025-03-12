@@ -224,6 +224,38 @@ if vim.fn.has('termguicolors') == 0 then
   vim.opt.termguicolors = false
 end
 
+-- Statusline customization
+vim.opt.laststatus = 2  -- Always show statusline
+vim.opt.showmode = false  -- Don't show mode in command line
+
+-- Custom statusline function
+function _G.statusline()
+  local mode = vim.api.nvim_get_mode().mode
+  local filename = vim.fn.expand('%:t')
+  local modified = vim.bo.modified and '[+]' or ''
+  local readonly = vim.bo.readonly and '[RO]' or ''
+  local filetype = vim.bo.filetype ~= '' and vim.bo.filetype or 'no ft'
+  local pos = string.format('%d:%d', vim.fn.line('.'), vim.fn.col('.'))
+  
+  return string.format(
+    '%%#StatusLineMode#  %s %%#StatusLineFile# %s%s%s %%#StatusLineInfo# [%s] %%=%s ',
+    mode:upper(),
+    filename,
+    modified,
+    readonly,
+    filetype,
+    pos
+  )
+end
+
+-- Set the statusline
+vim.opt.statusline = '%!v:lua.statusline()'
+
+-- Statusline colors
+vim.api.nvim_set_hl(0, "StatusLineMode", { bg = "#7aa2f7", fg = "#1a1b26", bold = true })
+vim.api.nvim_set_hl(0, "StatusLineFile", { bg = "#292e42", fg = "#c0caf5", bold = true })
+vim.api.nvim_set_hl(0, "StatusLineInfo", { bg = "#1a1b26", fg = "#7dcfff" })
+
 -- Keymaps
 vim.keymap.set("n", "<leader>w", "<cmd>w<cr>", { desc = "Save" })
 vim.keymap.set("n", "<leader>q", "<cmd>q<cr>", { desc = "Quit" })
