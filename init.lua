@@ -5,16 +5,15 @@ if not vim.loop.fs_stat(lazypath) then
   local parent_dir = vim.fn.stdpath("data") .. "/lazy"
   vim.fn.mkdir(parent_dir, "p")
   
-  -- Clone into the parent directory with the correct target folder name
+  -- Clone into the parent directory
   vim.fn.system({
     "git",
     "clone",
     "--filter=blob:none",
     "https://github.com/folke/lazy.nvim.git",
     "--branch=stable", -- latest stable release
-    parent_dir,
-    ">/dev/null", -- Redirect stdout
-    "2>/dev/null", -- Redirect stderr
+    lazypath,
+    ">/dev/null 2>&1", -- Redirect both stdout and stderr
   })
 end
 vim.opt.rtp:prepend(lazypath)
