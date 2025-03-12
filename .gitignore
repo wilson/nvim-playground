@@ -1,1 +1,22 @@
 .aider*
+# Neovim
+.netrwhist
+**/spell/
+
+# Compiled Lua sources
+luac.out
+
+# Logs
+*.log
+
+# Temporary files
+*~
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Don't ignore lazy-lock.json as it should be tracked
+# lazy-lock.json
