@@ -29,7 +29,13 @@ vim.keymap.set({ "n", "v" }, "\\", "<Nop>", { silent = true })
 vim.opt.shortmess:append("I") -- Disable intro message
 
 -- Plugin setup
-require("lazy").setup({
+local lazy_ok, lazy = pcall(function() return require("lazy") end)
+if not lazy_ok then
+  vim.notify("lazy.nvim not found", vim.log.levels.ERROR)
+  return
+end
+
+lazy.setup({
   -- Tree-sitter
   {
     "nvim-treesitter/nvim-treesitter",
