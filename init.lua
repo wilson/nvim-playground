@@ -28,7 +28,10 @@ require("lazy").setup({
     config = function()
       require("nvim-treesitter.configs").setup({
         ensure_installed = { "lua", "vim", "vimdoc", "rust" },
-        highlight = { enable = true },
+        highlight = { 
+          enable = true,
+          additional_vim_regex_highlighting = false,
+        },
         indent = { enable = true },
         textobjects = {
           select = {
@@ -169,6 +172,9 @@ vim.opt.shiftwidth = 2
 vim.opt.expandtab = true
 vim.opt.number = true
 vim.opt.signcolumn = "yes"
+
+-- Set a colorscheme
+vim.cmd('colorscheme habamax') -- Using a built-in colorscheme
 vim.opt.termguicolors = true
 vim.opt.updatetime = 250
 vim.opt.timeoutlen = 300
