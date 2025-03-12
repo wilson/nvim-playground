@@ -157,13 +157,19 @@ require("lazy").setup({
 })
 
 -- LSP Configuration
-local lspconfig = require("lspconfig")
-local capabilities = require("cmp_nvim_lsp").default_capabilities()
+local lspconfig = vim.F.npcall(require, "lspconfig")
+if not lspconfig then
+  vim.notify("lspconfig not found", vim.log.levels.ERROR)
+  return
+end
+
+local cmp_nvim_lsp = vim.F.npcall(require, "cmp_nvim_lsp")
+local capabilities = cmp_nvim_lsp and cmp_nvim_lsp.default_capabilities() or {}
 
 -- Setup common LSP servers
 local servers = { "lua_ls", "rust_analyzer", "luau_lsp" }
-for _, lsp in ipairs(servers) do
-  local ok, _ = pcall(require, "lspconfig." .. lsp)
+for _, lsp in pairs(servers) do
+  local ok, _ = pcall(function() return require("lspconfig." .. lsp) end)
   if ok then
     lspconfig[lsp].setup({ capabilities = capabilities })
   end
@@ -177,8 +183,17 @@ vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, { desc = "Rename" })
 vim.keymap.set("n", "<leader>f", vim.lsp.buf.format, { desc = "Format" })
 
 -- Completion setup
-local cmp = require("cmp")
-local luasnip = require("luasnip")
+local cmp = vim.F.npcall(require, "cmp")
+if not cmp then
+  vim.notify("nvim-cmp not found", vim.log.levels.ERROR)
+  return
+end
+
+local luasnip = vim.F.npcall(require, "luasnip")
+if not luasnip then
+  vim.notify("luasnip not found", vim.log.levels.ERROR)
+  return
+end
 
 cmp.setup({
   snippet = {
@@ -285,8 +300,13 @@ vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highl
 -- Use a more explicit mapping for the linter
 vim.keymap.set("n", "<leader>ll", function() 
   vim.notify("Running linter...", vim.log.levels.INFO)
-  require("lint").try_lint() 
-  vim.notify("Linter completed", vim.log.levels.INFO)
+  local lint = vim.F.npcall(require, "lint")
+  if lint then
+    lint.try_lint()
+    vim.notify("Linter completed", vim.log.levels.INFO)
+  else
+    vim.notify("Linter not available", vim.log.levels.ERROR)
+  end
 end, { desc = "Run linter" })
 
 -- Automatically run linter on certain events
@@ -294,7 +314,10 @@ vim.api.nvim_create_autocmd({ "BufWritePost", "BufEnter" }, {
   callback = function()
     -- Only run linter if the buffer has a filetype
     if vim.bo.filetype and vim.bo.filetype ~= "" then
-      require("lint").try_lint()
+      local lint = vim.F.npcall(require, "lint")
+      if lint then
+        lint.try_lint()
+      end
     end
   end,
 })
