@@ -297,40 +297,165 @@ vim.keymap.set("n", "<leader>gh", function()
   
   append_line("# Git Repository Health Check")
   append_line("")
-  append_line("## Checking for corrupted objects...")
+  append_line("## Running comprehensive diagnostics...")
   
-  vim.fn.jobstart("git fsck --full", {
-    on_stdout = function(_, data)
-      if data then
-        for _, line in ipairs(data) do
-          if line ~= "" then
-            append_line("  " .. line)
-          end
-        end
-      end
-    end,
-    on_stderr = function(_, data)
-      if data then
-        for _, line in ipairs(data) do
-          if line ~= "" then
-            append_line("  ERROR: " .. line)
-          end
-        end
-      end
-    end,
-    on_exit = function()
+  -- Track if we found any issues
+  local issues_found = false
+  
+  -- Run a series of git checks
+  local checks = {
+    {
+      cmd = "git fsck --full",
+      title = "Checking for corrupted objects",
+      error_pattern = "error|dangling|missing|broken"
+    },
+    {
+      cmd = "git rev-parse HEAD",
+      title = "Verifying HEAD reference",
+      error_pattern = "fatal|error"
+    },
+    {
+      cmd = "git status -s",
+      title = "Checking working tree status",
+      -- No error pattern, just informational
+    },
+    {
+      cmd = "git reflog expire --expire=now --all",
+      title = "Checking reflog integrity",
+      error_pattern = "fatal|error"
+    }
+  }
+  
+  local check_index = 1
+  
+  local function run_next_check()
+    if check_index > #checks then
+      -- All checks completed
       append_line("")
-      append_line("## Suggested fixes:")
+      append_line("## Repair options:")
       append_line("")
-      append_line("If corrupted objects were found, try these commands:")
-      append_line("```")
-      append_line("# Try to repair the repository")
+      
+      if issues_found then
+        append_line("Issues were detected. Try these repair commands:")
+      else
+        append_line("No major issues detected. For maintenance, you can run:")
+      end
+      
+      append_line("```bash")
+      append_line("# Basic cleanup and optimization")
       append_line("git gc --aggressive --prune=now")
       append_line("")
-      append_line("# If that doesn't work, try cloning a fresh copy")
-      append_line("cd ..")
-      append_line("git clone <repository-url> fresh-repo")
+      append_line("# Verify and repair references")
+      append_line("git reflog expire --expire=now --all")
+      append_line("git repack -ad")
+      append_line("git prune")
+      append_line("")
+      
+      if issues_found then
+        append_line("# For serious corruption, try these more aggressive options:")
+        append_line("git fsck --full --strict")
+        append_line("")
+        append_line("# Last resort - clone a fresh copy")
+        append_line("cd ..")
+        append_line("git clone <repository-url> fresh-repo")
+      end
+      
       append_line("```")
+      
+      -- Add keybinding to run repair
+      append_line("")
+      append_line("Press 'r' to run basic repair commands automatically")
+      
+      -- Add keybinding to run repair
+      vim.api.nvim_buf_set_keymap(health_buffer, 'n', 'r', '', {
+        callback = function()
+          append_line("")
+          append_line("## Running repair commands...")
+          
+          vim.fn.jobstart("git gc --aggressive --prune=now && git reflog expire --expire=now --all && git repack -ad && git prune", {
+            on_stdout = function(_, data)
+              if data then
+                for _, line in ipairs(data) do
+                  if line ~= "" then
+                    append_line("  " .. line)
+                  end
+                end
+              end
+            end,
+            on_stderr = function(_, data)
+              if data then
+                for _, line in ipairs(data) do
+                  if line ~= "" then
+                    append_line("  " .. line)
+                  end
+                end
+              end
+            end,
+            on_exit = function(_, code)
+              append_line("")
+              if code == 0 then
+                append_line("✅ Repair completed successfully!")
+              else
+                append_line("❌ Repair failed with exit code: " .. code)
+                append_line("You may need to try more aggressive repair options.")
+              end
+            end
+          })
+        end,
+        noremap = true,
+        silent = true,
+        desc = "Run git repair commands"
+      })
+      
+      return
     end
-  })
+    
+    local check = checks[check_index]
+    append_line("")
+    append_line("## " .. check.title .. "...")
+    
+    vim.fn.jobstart(check.cmd, {
+      on_stdout = function(_, data)
+        if data then
+          for _, line in ipairs(data) do
+            if line ~= "" then
+              if check.error_pattern and line:match(check.error_pattern) then
+                issues_found = true
+                append_line("  ❌ " .. line)
+              else
+                append_line("  " .. line)
+              end
+            end
+          end
+        end
+      end,
+      on_stderr = function(_, data)
+        if data then
+          for _, line in ipairs(data) do
+            if line ~= "" then
+              issues_found = true
+              append_line("  ❌ ERROR: " .. line)
+            end
+          end
+        end
+      end,
+      on_exit = function(_, code)
+        if code ~= 0 then
+          issues_found = true
+          append_line("  ❌ Command failed with exit code: " .. code)
+        elseif not vim.api.nvim_buf_line_count(health_buffer) or 
+               vim.api.nvim_buf_get_lines(health_buffer, -2, -1, false)[1] == "## " .. check.title .. "..." then
+          -- If no output was produced and last line is the title
+          append_line("  ✅ No issues found")
+        end
+        
+        check_index = check_index + 1
+        run_next_check()
+      end
+    })
+  end
+  
+  -- Start the first check
+  run_next_check()
+  
 end, { desc = "Git repository health check" })
