@@ -98,40 +98,20 @@ require("lazy").setup({
     config = function()
       require("tokyonight").setup({
         style = "night",
-        light_style = "day",
-        transparent = true,  -- Enable transparency to use terminal background
+        transparent = true,  -- Use terminal background
         terminal_colors = true,
         styles = {
           comments = { italic = true },
           keywords = { italic = true },
-          functions = {},
-          variables = {},
-          strings = {},  -- No italic for strings
         },
-        sidebars = { "qf", "help" },
-        day_brightness = 0.3,
-        hide_inactive_statusline = false,
-        dim_inactive = false,
-        lualine_bold = false,
-        -- Darker background for better contrast with terminal
+        -- Optimize for 256-color terminal
         on_colors = function(colors)
-          colors.bg = "#1a1b26"  -- Slightly darker background
-          colors.bg_dark = "#16161e"  -- Even darker background for UI elements
+          colors.bg = "#1a1b26"
+          colors.bg_dark = "#16161e"
         end,
-        -- Customize specific syntax highlighting
         on_highlights = function(highlights, colors)
-          -- Improve string highlighting - use a more visible color instead of white on cyan
-          highlights.String = { fg = "#ff9e64" }  -- Orange for strings
-          highlights.Character = { fg = "#ff9e64" }
-          
-          -- Fix function highlighting - use blue instead of green
-          highlights.Function = { fg = "#7aa2f7" }  -- Blue for functions
-          highlights.TSFunction = { fg = "#7aa2f7" }
-          highlights.TSFuncBuiltin = { fg = "#7aa2f7" }  -- Built-in functions like "require"
-          
-          -- Make sure we're in dark mode
-          highlights.Normal = { bg = colors.bg, fg = colors.fg }
-          highlights.NormalFloat = { bg = colors.bg_dark, fg = colors.fg }
+          highlights.String = { fg = "#ff9e64" }
+          highlights.Function = { fg = "#7aa2f7" }
         end,
       })
       vim.cmd([[colorscheme tokyonight-night]])
@@ -152,20 +132,11 @@ local capabilities = require("cmp_nvim_lsp").default_capabilities()
 -- Setup common LSP servers
 local servers = { "lua_ls", "rust_analyzer" }
 for _, lsp in ipairs(servers) do
-  -- Only set up the server if it's available
   local ok, _ = pcall(require, "lspconfig." .. lsp)
   if ok then
-    lspconfig[lsp].setup({
-      capabilities = capabilities,
-    })
+    lspconfig[lsp].setup({ capabilities = capabilities })
   end
 end
-
--- NOTE: To install language servers:
--- lua_ls: Install with your package manager or Mason.nvim
---   macOS: brew install lua-language-server
---   or add "williamboman/mason.nvim" to your plugins
--- rust_analyzer: Install with rustup component add rust-analyzer
 
 -- LSP keymaps
 vim.keymap.set("n", "gd", vim.lsp.buf.definition, { desc = "Go to definition" })
@@ -220,29 +191,18 @@ vim.opt.shiftwidth = 2
 vim.opt.expandtab = true
 vim.opt.number = true
 vim.opt.signcolumn = "yes"
-
--- Set a colorscheme with better syntax highlighting
-vim.opt.termguicolors = true -- Enable true color support
--- Using tokyonight-night colorscheme (already configured in the plugins section)
-
--- Force dark background
-vim.opt.background = "dark"
-
--- Enhance Treesitter highlighting
-local treesitter_parser_config = require('nvim-treesitter.parsers').get_parser_configs()
-treesitter_parser_config.lua = {
-  install_info = {
-    url = "https://github.com/MunifTanjim/tree-sitter-lua",
-    files = {"src/parser.c", "src/scanner.c"},
-    branch = "main"
-  },
-}
 vim.opt.termguicolors = true
+vim.opt.background = "dark"
 vim.opt.updatetime = 250
 vim.opt.timeoutlen = 300
 vim.opt.undofile = true
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
+
+-- Optimize for 256-color terminal
+if vim.fn.has('termguicolors') == 0 or vim.env.TERM == 'xterm-256color' then
+  vim.opt.termguicolors = false
+end
 
 -- Keymaps
 vim.keymap.set("n", "<leader>w", "<cmd>w<cr>", { desc = "Save" })
