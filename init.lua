@@ -22,6 +22,9 @@ vim.opt.rtp:prepend(lazypath)
 vim.g.mapleader = "\\"
 vim.g.maplocalleader = "\\"
 
+-- Make sure leader key is properly recognized
+vim.keymap.set({ "n", "v" }, "\\", "<Nop>", { silent = true })
+
 -- Add a splash screen to hide startup messages
 vim.opt.shortmess:append("I") -- Disable intro message
 
@@ -278,7 +281,12 @@ vim.api.nvim_set_hl(0, "StatusLineInfo", { bg = "#1a1b26", fg = "#7dcfff" })
 vim.keymap.set("n", "<leader>w", "<cmd>w<cr>", { desc = "Save" })
 vim.keymap.set("n", "<leader>q", "<cmd>q<cr>", { desc = "Quit" })
 vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
-vim.keymap.set("n", "<leader>ll", function() require("lint").try_lint() end, { desc = "Run linter" })
+-- Use a more explicit mapping for the linter
+vim.keymap.set("n", "<leader>ll", function() 
+  vim.cmd("echom 'Running linter...'")
+  require("lint").try_lint() 
+  vim.cmd("echom 'Linter completed'")
+end, { desc = "Run linter" })
 
 -- Automatically run linter on certain events
 vim.api.nvim_create_autocmd({ "BufWritePost", "BufEnter" }, {
