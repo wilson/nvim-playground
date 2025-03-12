@@ -283,15 +283,18 @@ vim.keymap.set("n", "<leader>q", "<cmd>q<cr>", { desc = "Quit" })
 vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
 -- Use a more explicit mapping for the linter
 vim.keymap.set("n", "<leader>ll", function() 
-  vim.cmd("echom 'Running linter...'")
+  vim.notify("Running linter...", vim.log.levels.INFO)
   require("lint").try_lint() 
-  vim.cmd("echom 'Linter completed'")
+  vim.notify("Linter completed", vim.log.levels.INFO)
 end, { desc = "Run linter" })
 
 -- Automatically run linter on certain events
 vim.api.nvim_create_autocmd({ "BufWritePost", "BufEnter" }, {
   callback = function()
-    require("lint").try_lint()
+    -- Only run linter if the buffer has a filetype
+    if vim.bo.filetype and vim.bo.filetype ~= "" then
+      require("lint").try_lint()
+    end
   end,
 })
 
@@ -306,21 +309,28 @@ vim.api.nvim_create_autocmd("BufWritePre", {
 -- Create .luacheckrc file if it doesn't exist
 local luacheckrc_path = vim.fn.getcwd() .. "/.luacheckrc"
 if vim.fn.filereadable(luacheckrc_path) == 0 then
-  local file = io.open(luacheckrc_path, "w")
-  if file then
-    file:write([[
--- Lua linter configuration
-std = {
-  globals = {"vim"},
-  read_globals = {"vim"}
-}
--- Increase line length limit
-max_line_length = 120
--- Ignore unused self parameter in methods
-self = false
-]])
-    file:close()
-    print("Created .luacheckrc file")
+  -- Use vim.fn.writefile instead of io.open for better compatibility
+  local content = {
+    "-- Lua linter configuration",
+    "std = {",
+    "  globals = {\"vim\"},",
+    "  read_globals = {\"vim\"}",
+    "}",
+    "-- Increase line length limit",
+    "max_line_length = 120",
+    "-- Ignore unused self parameter in methods",
+    "self = false",
+    "-- Ignore whitespace warnings",
+    "ignore = {\"611\", \"612\", \"613\", \"614\"}",
+    "-- Be more lenient with line length in comments",
+    "max_comment_line_length = 160"
+  }
+  
+  local result = vim.fn.writefile(content, luacheckrc_path)
+  if result == 0 then
+    vim.notify("Created .luacheckrc file", vim.log.levels.INFO)
+  else
+    vim.notify("Failed to create .luacheckrc file", vim.log.levels.ERROR)
   end
 end
 
