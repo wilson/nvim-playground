@@ -79,8 +79,23 @@ require("lazy").setup({
         "williamboman/mason-lspconfig.nvim",
         config = function()
           require("mason-lspconfig").setup({
-            ensure_installed = { "lua_ls", "rust_analyzer" },
+            ensure_installed = { "lua_ls", "rust_analyzer", "luau_lsp" },
             automatic_installation = true,
+          })
+        end,
+      },
+      -- Linter integration
+      {
+        "mfussenegger/nvim-lint",
+        config = function()
+          require("lint").linters_by_ft = {
+            lua = {"luacheck"},
+          }
+          -- Run linter on save
+          vim.api.nvim_create_autocmd({ "BufWritePost" }, {
+            callback = function()
+              require("lint").try_lint()
+            end,
           })
         end,
       },
@@ -143,7 +158,7 @@ local lspconfig = require("lspconfig")
 local capabilities = require("cmp_nvim_lsp").default_capabilities()
 
 -- Setup common LSP servers
-local servers = { "lua_ls", "rust_analyzer" }
+local servers = { "lua_ls", "rust_analyzer", "luau_lsp" }
 for _, lsp in ipairs(servers) do
   local ok, _ = pcall(require, "lspconfig." .. lsp)
   if ok then
@@ -263,4 +278,26 @@ vim.api.nvim_set_hl(0, "StatusLineInfo", { bg = "#1a1b26", fg = "#7dcfff" })
 vim.keymap.set("n", "<leader>w", "<cmd>w<cr>", { desc = "Save" })
 vim.keymap.set("n", "<leader>q", "<cmd>q<cr>", { desc = "Quit" })
 vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
+vim.keymap.set("n", "<leader>ll", function() require("lint").try_lint() end, { desc = "Run linter" })
+
+-- Create .luacheckrc file if it doesn't exist
+local luacheckrc_path = vim.fn.getcwd() .. "/.luacheckrc"
+if vim.fn.filereadable(luacheckrc_path) == 0 then
+  local file = io.open(luacheckrc_path, "w")
+  if file then
+    file:write([[
+-- Lua linter configuration
+std = {
+  globals = {"vim"},
+  read_globals = {"vim"}
+}
+-- Increase line length limit
+max_line_length = 120
+-- Ignore unused self parameter in methods
+self = false
+]])
+    file:close()
+    print("Created .luacheckrc file")
+  end
+end
 
