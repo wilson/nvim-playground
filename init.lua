@@ -2,7 +2,7 @@ local PKGS = {
     { 'savq/paq-nvim' },
 
     -- Tree-sitter
-    { 'nvim-treesitter/nvim-treesitter', run = function() cmd 'TSUpdate' end },
+    { 'nvim-treesitter/nvim-treesitter', build = function() cmd 'TSUpdate' end },
     'nvim-treesitter/nvim-treesitter-textobjects',
 
     -- LSP & Language plugins
