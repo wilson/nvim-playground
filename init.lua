@@ -75,18 +75,20 @@ function init.setup_terminal_app_mode()
     syntax clear
     hi clear
 
-    " Set minimal readable colors for startup
+    " Set base colors with 256-color palette for startup
     " The full colorscheme will be applied later
-    hi Normal ctermfg=7 ctermbg=0
-    hi Statement ctermfg=1 cterm=bold
-    hi Comment ctermfg=8 cterm=italic
-    " Set our color adjustments early
-    hi Keyword ctermfg=6 cterm=bold
-    hi Directory ctermfg=12
-    hi Constant ctermfg=5 cterm=bold
-    hi Number ctermfg=5
-    hi Boolean ctermfg=5 cterm=bold
-    hi String ctermfg=2
+    hi Normal ctermfg=252 ctermbg=233      " Light gray text on very dark gray
+    hi LineNr ctermfg=240 ctermbg=234      " Medium gray line numbers on slightly lighter bg
+    hi Comment ctermfg=245 cterm=italic    " Medium gray with italic
+    " Set initial syntax colors
+    hi Keyword    ctermfg=81  cterm=bold   " Light blue
+    hi Directory  ctermfg=75               " Bright blue
+    hi Function   ctermfg=148 cterm=bold   " Yellow-green
+    hi Statement  ctermfg=168 cterm=bold   " Light coral red
+    hi Constant   ctermfg=170 cterm=bold   " Light purple
+    hi Number     ctermfg=141              " Lighter purple
+    hi Boolean    ctermfg=176 cterm=bold   " Pinkish purple
+    hi String     ctermfg=114              " Light green
 
     " Redraw to prevent flash of unstyled content
     redraw
@@ -130,24 +132,136 @@ lazy.setup({
       local lang_config = load_language_config()
       -- Check headless mode
       local is_headless = #vim.api.nvim_list_uis() == 0
-      -- Skip parser installation in headless mode
-      local parsers_to_install = {}
-      if not is_headless and lang_config.treesitter_parsers then
-        -- Get parsers that need installation
-        parsers_to_install = lang_config.treesitter_parsers
+
+      -- Avoid reinstalling parsers on every startup
+      -- Use a state file to track when we've already installed parsers
+      local cache_dir = vim.fn.stdpath("cache")
+      local ts_installed_file = cache_dir .. "/ts_parsers_installed"
+      local parsers_need_install = false
+      -- Check if we've installed parsers before
+      if not vim.loop.fs_stat(ts_installed_file) and not is_headless then
+        parsers_need_install = true
+        -- Create the state file to mark parsers as installed
+        vim.fn.writefile({os.date("%Y-%m-%d")}, ts_installed_file)
+        -- Get parser dir to monitor installation progress
+        local runtime_dir = vim.api.nvim_get_runtime_file("parser", true)[1]
+        local parser_dir = runtime_dir or (vim.fn.stdpath("data") .. "/site/parser")
+        -- Immediately show a startup message
+        print("\n ⬇️  Installing TreeSitter parsers in parallel (this will be faster)...")
+        -- Create counters for tracking installation progress
+        local total_parsers = #lang_config.treesitter_parsers
+        _G._ts_install_start_time = vim.loop.now()
+        -- Create a timer to periodically check parser installation progress
+        local timer = vim.loop.new_timer()
+        if timer then
+          -- Function to count installed parsers by checking the file system
+          local function count_installed_parsers()
+            local count = 0
+            -- Check if the parser directory exists
+            if vim.fn.isdirectory(parser_dir) == 1 then
+              -- Count parser files in the directory
+              local parser_files = vim.fn.glob(parser_dir .. "/*.so", false, true)
+              count = #parser_files
+            end
+            return count
+          end
+          -- Track progress every 2 seconds
+          timer:start(1000, 2000, vim.schedule_wrap(function()
+            local elapsed = math.floor((vim.loop.now() - _G._ts_install_start_time) / 1000)
+            local installed = count_installed_parsers()
+            local percent = installed > 0
+              and math.floor((installed / total_parsers) * 100)
+              or 0
+            -- Show progress with percentage
+            print(string.format(" ⌛ TreeSitter installation: %d%% complete (%d/%d parsers, %ds elapsed)",
+                               percent, installed, total_parsers, elapsed))
+            -- Check if installation is complete
+            if installed >= total_parsers or elapsed > 50 then
+              if not timer:is_closing() then
+                timer:stop()
+                timer:close()
+                print(string.format(" ✅ TreeSitter installation completed! (%d/%d parsers in %ds)",
+                                  installed, total_parsers, elapsed))
+              end
+            end
+          end))
+          -- Set a maximum timeout
+          vim.defer_fn(function()
+            if not timer:is_closing() then
+              timer:stop()
+              timer:close()
+              local elapsed = math.floor((vim.loop.now() - _G._ts_install_start_time) / 1000)
+              local installed = count_installed_parsers()
+              print(string.format(" ✅ TreeSitter installation timed out, but completed with %d/%d parsers in %ds",
+                                installed, total_parsers, elapsed))
+            end
+            -- Clean up global state
+            _G._ts_install_start_time = nil
+          end, 60000) -- Allow 60 seconds for parallel installation
+        end
       end
 
       -- Configure treesitter
+      -- First, set up a more aggressive approach to reduce TreeSitter installation verbosity
+      if parsers_need_install then
+        -- Suppress TreeSitter installation messages
+        local old_handler = vim.notify
+        local old_print = _G.print
+        -- Simple function to filter TreeSitter messages
+        local function is_treesitter_message(msg)
+          if type(msg) ~= "string" then return false end
+          return msg:match("[Tt]ree[%-]?[Ss]itter") or
+                 msg:match("[Tt]emporary [Dd]irectory") or
+                 msg:match("[Ee]xtracting") or
+                 msg:match("[Cc]ompiling") or
+                 msg:match("[Dd]ownloading") or
+                 msg:match("Installing parser") or
+                 msg:match("has been installed")
+        end
+        -- Override notify to hide TreeSitter messages
+        vim.notify = function(msg, level, opts)
+          -- Skip TreeSitter messages
+          if is_treesitter_message(msg) then
+            return
+          end
+          -- Pass through other messages
+          old_handler(msg, level, opts)
+        end
+        -- Override print to hide TreeSitter messages but allow our progress updates
+        _G.print = function(...)
+          local args = {...}
+          local msg = args[1]
+          -- Allow our progress messages
+          if type(msg) == "string" and (msg:match("%%") or msg:match("⬇️") or msg:match("⌛") or msg:match("✅")) then
+            old_print(...)
+            return
+          end
+          -- Skip TreeSitter messages
+          if is_treesitter_message(msg) then
+            return
+          end
+          -- Pass through other messages
+          old_print(...)
+        end
+        -- Restore original functions after installation finishes
+        vim.defer_fn(function()
+          vim.notify = old_handler
+          _G.print = old_print
+        end, 50000)  -- Allow 50 seconds for installation
+      end
+      -- Configure TreeSitter with parallel installation
       require("nvim-treesitter.configs").setup({
         auto_install = false,
-        sync_install = not is_headless,
-        ensure_installed = not is_headless and parsers_to_install or {},
+        sync_install = false, -- Use async installation for better performance
+        ensure_installed = parsers_need_install and lang_config.treesitter_parsers or {},
 
         highlight = {
           enable = true,
           additional_vim_regex_highlighting = true,
           -- Disable treesitter highlighting in terminal mode
-          disable = function() return vim.g.terminal_app_mode end,
+          disable = function(_)
+            return vim.g.terminal_app_mode -- Only disable in terminal mode
+          end,
         },
 
         -- Better indentation with treesitter
@@ -544,38 +658,41 @@ local function force_reset_syntax()
   -- Use lw-rubber for basic color mode too (with cterm colors)
   vim.cmd("colorscheme lw-rubber")
 
-  -- Only override the problematic blue colors while letting lw-rubber handle the rest
+  -- Use enhanced 256-color palette for terminal mode while letting lw-rubber handle the base
   vim.cmd([[
     " Enable syntax highlighting first to let lw-rubber define most colors
     syntax on
     syntax enable
-    " Only override colors that are hard to see on dark backgrounds
-    " These overrides target elements that would typically use dark blue (color 4)
-    hi Keyword    ctermfg=6  cterm=bold     " Changed from blue(4) to cyan(6) for better visibility
-    hi Directory  ctermfg=12                " Changed from blue(4) to bright blue(12) for better visibility
-    hi Function   cterm=bold                " Add bold to make functions stand out
-    hi Statement  cterm=bold                " Add bold to make statements stand out
-    hi Type       cterm=bold                " Add bold to make types stand out
-    " Ensure constants are visible with distinct colors
-    hi Constant   ctermfg=5  cterm=bold     " Magenta with bold for constants
-    hi Number     ctermfg=5                 " Magenta for numbers
-    hi Boolean    ctermfg=5  cterm=bold     " Magenta with bold for booleans
-    hi Float      ctermfg=5                 " Magenta for floating point
-    hi String     ctermfg=2                 " Green for strings
-    " Forcibly set Comment to maintain italic
-    hi Comment    cterm=italic
+    " Use 256 colors for better visibility and closer GUI appearance
+    " Color codes reference: https://jonasjacek.github.io/colors/
+    " Syntax elements
+    hi Keyword    ctermfg=81  cterm=bold     " Light blue (closer to GUI blue)
+    hi Directory  ctermfg=75                 " Bright blue - visible but not harsh
+    hi Function   ctermfg=148 cterm=bold     " Yellow-green for functions
+    hi Statement  ctermfg=168 cterm=bold     " Light coral red for statements
+    hi Type       ctermfg=178 cterm=bold     " Gold/mustard for types
+    " Constants and values
+    hi Constant   ctermfg=170 cterm=bold     " Light purple for constants
+    hi Number     ctermfg=141                " Lighter purple for numbers
+    hi Boolean    ctermfg=176 cterm=bold     " Pinkish purple for booleans
+    hi Float      ctermfg=135                " Medium purple for floats
+    hi String     ctermfg=114                " Light green for strings
+    " Other common elements
+    hi Comment    ctermfg=245 cterm=italic   " Medium gray with italic
+    hi Visual     ctermbg=238                " Dark gray for selections
+    hi Search     ctermfg=232 ctermbg=214    " Black on amber for search
+    hi MatchParen ctermfg=232 ctermbg=214    " Black on amber for matching parentheses
+    hi Error      ctermfg=231 ctermbg=196    " White on red for errors
+    hi Todo       ctermfg=232 ctermbg=226    " Black on yellow for todos
   ]])
 
   -- Let plugin-based highlighting take over
   -- Enhanced plugins will provide better highlighting
 
   -- Only notify if this was triggered by a user command, not during startup
-  if vim.v.vim_did_enter == 1 then
-    if was_gui_mode then
-      vim.notify("Switched from GUI mode to basic color mode", vim.log.levels.INFO)
-    else
-      vim.notify("Refreshed basic color mode", vim.log.levels.INFO)
-    end
+  if vim.v.vim_did_enter == 1 and was_gui_mode and vim.g.explicit_mode_change then
+    -- Only notify when explicitly switching from GUI mode
+    vim.notify("Switched from GUI mode to basic color mode", vim.log.levels.INFO)
   end
 end
 
@@ -635,13 +752,13 @@ local function get_treesitter_info()
   return {
     "",
     "Tree-sitter settings:",
-    "  tree-sitter version: " .. (vim.fn.has('nvim-0.9.0') and "0.25.3 (latest)" or "unknown"),
+    "  tree-sitter availability: " .. (vim.fn.exists(":TSInstall") == 2 and "Installed" or "Not available"),
     "  parsers installed: " .. (vim.fn.exists(":TSInstallInfo") == 2 and "Use :TSInstallInfo to see" or "none"),
     "  highlight enabled: " .. tostring(not vim.g.terminal_app_mode),
     "",
     "Current Mode:",
     "  " .. (vim.g.terminal_app_mode
-      and "Basic color mode (ANSI colors with lw-rubber, vim syntax)"
+      and "Basic color mode (256 colors with lw-rubber, vim syntax)"
       or "GUI mode (true colors with lw-rubber, tree-sitter)"),
   }
 end
@@ -654,6 +771,7 @@ local function get_command_info()
     "  :BasicMode - Switch to basic color mode",
     "  :GUIMode - Switch to GUI mode with lw-rubber and tree-sitter",
     "  :Diagnostics - Display system and terminal diagnostics with color test",
+    "  :TSReinstall - Force reinstallation of TreeSitter parsers on next restart",
     "  <leader>p - Open GitHub Copilot panel",
     "",
     "Color Test (shows colored blocks):",
@@ -780,10 +898,10 @@ vim.api.nvim_create_user_command("Diagnostics", function()
     vim.api.nvim_buf_set_lines(buf, -1, -1, false, {
       "",
       "Recommendations for Terminal.app:",
-      "  1. Use :BasicMode to apply basic terminal colors that work in any terminal",
-      "  2. Make sure termguicolors is OFF in basic mode",
-      "  3. Optimized blue colors: Keywords use cyan (6), Directory uses bright blue (12) for visibility",
-      "  4. Consider using iTerm2 instead for better color support",
+      "  1. Use :BasicMode to apply enhanced 256-color mode that works in any modern terminal",
+      "  2. Make sure termguicolors is OFF in basic mode for maximum compatibility",
+      "  3. This config uses the full 256-color palette for vibrant syntax highlighting",
+      "  4. Consider using iTerm2 or Alacritty for even better color support",
       "  5. If using Terminal.app, go to Preferences > Profiles > [Your Profile] > Advanced",
       "     and ensure 'Report Terminal Type' is set to xterm-256color"
     })
@@ -798,24 +916,51 @@ end, {})
 
 -- No longer need RefreshSyntax command
 
--- No need for TSUpdate command anymore
+-- Add a command to force reinstallation of TreeSitter parsers
+vim.api.nvim_create_user_command("TSReinstall", function()
+  local cache_dir = vim.fn.stdpath("cache")
+  local ts_installed_file = cache_dir .. "/ts_parsers_installed"
+  -- Remove the state file to force reinstallation next time
+  if vim.loop.fs_stat(ts_installed_file) then
+    vim.fn.delete(ts_installed_file)
+    vim.notify("TreeSitter parsers will be reinstalled on next Neovim restart", vim.log.levels.INFO)
+  end
+  -- Ask user to restart Neovim
+  print("Please restart Neovim for changes to take effect.")
+end, {})
+
+-- TSEnableHighlight functionality is now integrated into GUIMode command
 
 -- Add explicit commands for Terminal.app mode and GUI mode
 vim.api.nvim_create_user_command("TerminalMode", function()
+  -- Mark that we're explicitly running the command
+  vim.g.explicit_mode_change = true
   -- Force Terminal.app mode
   vim.g.terminal_app_mode = true
   force_reset_syntax()
+  -- Clear the flag
+  vim.g.explicit_mode_change = nil
 end, {})
 
 vim.api.nvim_create_user_command("GUIMode", function()
+  -- Mark that we're explicitly running the command
+  vim.g.explicit_mode_change = true
   -- Enable GUI mode with tree-sitter
   vim.g.terminal_app_mode = false
   vim.opt.termguicolors = true
   vim.cmd("colorscheme lw-rubber")
 
-  -- Enable treesitter highlighting if available
+  -- Enable treesitter highlighting
   if vim.fn.exists(":TSBufEnable") == 2 then
     pcall(vim.cmd, "TSBufEnable highlight")
+    -- Also enable highlighting for all installed parsers
+    pcall(function()
+      local parsers = require("nvim-treesitter.parsers")
+      local installed = parsers.available_parsers()
+      for _, parser in ipairs(installed) do
+        pcall(vim.cmd, "TSEnable highlight " .. parser)
+      end
+    end)
   end
 
   -- Fire an event that other code can hook into
@@ -825,6 +970,8 @@ vim.api.nvim_create_user_command("GUIMode", function()
   if vim.v.vim_did_enter == 1 then
     vim.notify("Switched to GUI mode with tree-sitter highlights", vim.log.levels.INFO)
   end
+  -- Clear the flag
+  vim.g.explicit_mode_change = nil
 end, {})
 
 -- Create augroups for color mode compatibility
@@ -832,11 +979,16 @@ vim.api.nvim_create_augroup("ColorModeSettings", { clear = true })
 
 -- Add a command to switch to basic color mode
 vim.api.nvim_create_user_command("BasicMode", function()
+  -- Mark that we're explicitly running the command
+  vim.g.explicit_mode_change = true
+  -- Apply the syntax
   pcall(force_reset_syntax)
   -- Only notify after Vim is fully started
   if vim.v.vim_did_enter == 1 then
     vim.notify("Basic color mode applied", vim.log.levels.INFO)
   end
+  -- Clear the flag
+  vim.g.explicit_mode_change = nil
 end, {})
 
 -- Function to set up autocmds
@@ -858,9 +1010,26 @@ local function setup_autocmds()
       if is_headless then
         return
       end
-      -- Only apply basic color mode if we're in basic mode
+      -- Only apply basic color mode if we're in basic mode and only once on VimEnter
       if vim.g.terminal_app_mode then
-        pcall(force_reset_syntax)
+        -- Set a flag to avoid multiple startup messages
+        local is_vim_enter = vim.fn.exists('v:vim_did_enter') == 0
+        -- Temporarily disable notifications during startup
+        if not vim.g._init_colors_done and is_vim_enter then
+          -- Store old notify function
+          local old_notify = vim.notify
+          -- Set empty notify function
+          vim.notify = function() end
+          -- Run the syntax setup
+          pcall(force_reset_syntax)
+          -- Restore notify
+          vim.notify = old_notify
+          -- Set flag
+          vim.g._init_colors_done = true
+        else
+          -- Regular call for other events
+          pcall(force_reset_syntax)
+        end
       end
     end,
     desc = "Maintain basic color mode settings",
