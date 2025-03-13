@@ -1,8 +1,16 @@
--- Bootstrap helper function to install lazy.nvim if not presen
-local function bootstrap_lazy()
+-----------------------------------------------------------
+-- Module: Core Initialization
+-- Handles initial setup of Neovim including bootstrapping lazy.nvim
+-----------------------------------------------------------
+
+-- Define init module with functions for code organization
+local init = {}
+
+-- Bootstrap helper function to install lazy.nvim if not present
+function init.bootstrap_lazy()
   local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
   if not vim.loop.fs_stat(lazypath) then
-    -- Create the parent directory if it doesn't exis
+    -- Create the parent directory if it doesn't exist
     local parent_dir = vim.fn.stdpath("data") .. "/lazy"
     vim.fn.mkdir(parent_dir, "p")
 
@@ -20,11 +28,8 @@ local function bootstrap_lazy()
   vim.opt.rtp:prepend(lazypath)
 end
 
--- Run bootstrap
-bootstrap_lazy()
-
 -- Initialize editor basics
-local function setup_editor_basics()
+function init.setup_editor_basics()
   -- Set leader key before lazy setup
   vim.g.mapleader = "\\"
   vim.g.maplocalleader = "\\"
@@ -37,11 +42,11 @@ local function setup_editor_basics()
 end
 
 -- Setup basic color mode
-local function setup_terminal_app_mode()
+function init.setup_terminal_app_mode()
   -- Apply basic color mode settings
   -- Default to basic color mode (users can switch to GUI mode with <leader>tt)
   vim.opt.termguicolors = false  -- Disable true colors for basic compatibility
-  vim.opt.background = "dark"    -- Use dark mode for better contras
+  vim.opt.background = "dark"    -- Use dark mode for better contrast
 
   -- Create a global variable to track which mode we're in
   vim.g.terminal_app_mode = true
@@ -56,17 +61,13 @@ local function setup_terminal_app_mode()
     hi Statement ctermfg=1 cterm=bold
     hi Comment ctermfg=8
 
-    " Redraw to prevent flash of unstyled conten
+    " Redraw to prevent flash of unstyled content
     redraw
   ]])
 end
 
--- Run initialization functions
-setup_editor_basics()
-setup_terminal_app_mode()
-
--- Function to set up lazy.nvim for plugin managemen
-local function setup_lazy_plugin_manager()
+-- Function to set up lazy.nvim for plugin management
+function init.setup_lazy_plugin_manager()
   local lazy_ok, lazy = pcall(function() return require("lazy") end)
   if not lazy_ok then
     vim.notify("lazy.nvim not found", vim.log.levels.ERROR)
@@ -75,8 +76,13 @@ local function setup_lazy_plugin_manager()
   return lazy
 end
 
+-- Run bootstrap and initialization
+init.bootstrap_lazy()
+init.setup_editor_basics()
+init.setup_terminal_app_mode()
+
 -- Plugin setup
-local lazy = setup_lazy_plugin_manager()
+local lazy = init.setup_lazy_plugin_manager()
 if not lazy then
   return
 end
@@ -170,15 +176,12 @@ lazy.setup({
         config = function()
           local mason_lspconfig_ok, mason_lspconfig = pcall(function() return require("mason-lspconfig") end)
           if mason_lspconfig_ok then
+            -- Load our shared language configuration
+            local lang_config_ok, lang_config = pcall(require, "config.languages")
+            local language_servers = lang_config_ok and lang_config.language_servers or {}
+
             mason_lspconfig.setup({
-              ensure_installed = {
-                -- Programming languages
-                "lua_ls", "rust_analyzer", "pyright", "ruby_ls", "tsserver", "html", "cssls",
-                -- Config file formats
-                "jsonls", "taplo", "yamlls",
-                -- Additional specialized servers
-                "luau_lsp", "bashls"
-              },
+              ensure_installed = language_servers,
               automatic_installation = true,
             })
           end
@@ -190,14 +193,10 @@ lazy.setup({
         config = function()
           local lint_ok, lint = pcall(function() return require("lint") end)
           if lint_ok then
-            lint.linters_by_ft = {
-              lua = {"luacheck"},
-              python = {"pylint", "mypy"},
-              javascript = {"eslint"},
-              typescript = {"eslint"},
-              ruby = {"rubocop"},
-              rust = {"clippy"}
-            }
+            -- Load our shared language configuration for linters
+            local lang_config_ok, lang_config = pcall(require, "config.languages")
+            -- Use the linters mapping from our shared config
+            lint.linters_by_ft = lang_config_ok and lang_config.linters_by_ft or {}
             -- Run linter on save
             vim.api.nvim_create_autocmd({ "BufWritePost" }, {
               callback = function()
@@ -329,74 +328,99 @@ lazy.setup({
 -- Turn off cursorline highlight - works better in Terminal.app
 vim.opt.cursorline = false
 
--- LSP Configuration
-local lspconfig = vim.F.npcall(require, "lspconfig")
-if not lspconfig then
-  vim.notify("lspconfig not found", vim.log.levels.ERROR)
-  return
-end
+-----------------------------------------------------------
+-- Module: LSP Configuration
+-- Handles LSP server setup and completion configuration
+-----------------------------------------------------------
 
-local cmp_nvim_lsp = vim.F.npcall(require, "cmp_nvim_lsp")
-local capabilities = cmp_nvim_lsp and cmp_nvim_lsp.default_capabilities() or {}
+local lsp = {}
 
--- Setup common LSP servers
-local servers = {
-  "lua_ls", "rust_analyzer", "pyright", "ruby_ls", "tsserver",
-  "html", "cssls", "jsonls", "taplo", "yamlls", "luau_lsp", "bashls"
-}
-for _, lsp in pairs(servers) do
-  local ok, _ = pcall(function() return require("lspconfig." .. lsp) end)
-  if ok then
-    lspconfig[lsp].setup({ capabilities = capabilities })
+-- Initialize LSP services
+function lsp.setup()
+  local lspconfig = vim.F.npcall(require, "lspconfig")
+  if not lspconfig then
+    vim.notify("lspconfig not found", vim.log.levels.ERROR)
+    return false
   end
+
+  local cmp_nvim_lsp = vim.F.npcall(require, "cmp_nvim_lsp")
+  local capabilities = cmp_nvim_lsp and cmp_nvim_lsp.default_capabilities() or {}
+
+  -- Setup common LSP servers
+  local lang_config_ok, lang_config = pcall(require, "config.languages")
+  local servers = lang_config_ok and lang_config.language_servers or {}
+  for _, server in pairs(servers) do
+    local ok, _ = pcall(function() return require("lspconfig." .. server) end)
+    if ok then
+      lspconfig[server].setup({ capabilities = capabilities })
+    end
+  end
+
+  -- Set up key mappings
+  lsp.setup_keymaps()
+  return true
 end
 
--- LSP keymaps
-vim.keymap.set("n", "gd", vim.lsp.buf.definition, { desc = "Go to definition" })
-vim.keymap.set("n", "K", vim.lsp.buf.hover, { desc = "Hover documentation" })
-vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, { desc = "Code action" })
-vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, { desc = "Rename" })
-vim.keymap.set("n", "<leader>f", vim.lsp.buf.format, { desc = "Format" })
+-- Configure LSP keymaps
+function lsp.setup_keymaps()
+  vim.keymap.set("n", "gd", vim.lsp.buf.definition, { desc = "Go to definition" })
+  vim.keymap.set("n", "K", vim.lsp.buf.hover, { desc = "Hover documentation" })
+  vim.keymap.set("n", "<leader>ca", vim.lsp.buf.code_action, { desc = "Code action" })
+  vim.keymap.set("n", "<leader>rn", vim.lsp.buf.rename, { desc = "Rename" })
+  vim.keymap.set("n", "<leader>f", vim.lsp.buf.format, { desc = "Format" })
+end
 
--- Completion setup
-local cmp = vim.F.npcall(require, "cmp")
-if not cmp then
-  vim.notify("nvim-cmp not found", vim.log.levels.ERROR)
+-- Initialize completion
+function lsp.setup_completion()
+  local cmp = vim.F.npcall(require, "cmp")
+  if not cmp then
+    vim.notify("nvim-cmp not found", vim.log.levels.ERROR)
+    return false
+  end
+
+  local luasnip = vim.F.npcall(require, "luasnip")
+  if not luasnip then
+    vim.notify("luasnip not found", vim.log.levels.ERROR)
+    return false
+  end
+
+  cmp.setup({
+    snippet = {
+      expand = function(args)
+        luasnip.lsp_expand(args.body)
+      end,
+    },
+    mapping = cmp.mapping.preset.insert({
+      ["<C-Space>"] = cmp.mapping.complete(),
+      ["<CR>"] = cmp.mapping.confirm({ select = true }),
+      ["<Tab>"] = cmp.mapping(function(fallback)
+        if cmp.visible() then
+          cmp.select_next_item()
+        elseif luasnip.expand_or_jumpable() then
+          luasnip.expand_or_jump()
+        else
+          fallback()
+        end
+      end, { "i", "s" }),
+    }),
+    sources = cmp.config.sources({
+      { name = "nvim_lsp" },
+      { name = "luasnip" },
+      { name = "buffer" },
+      { name = "path" },
+    }),
+  })
+  return true
+end
+
+-- Initialize LSP services and completion
+if not lsp.setup() then
   return
 end
 
-local luasnip = vim.F.npcall(require, "luasnip")
-if not luasnip then
-  vim.notify("luasnip not found", vim.log.levels.ERROR)
+if not lsp.setup_completion() then
   return
 end
-
-cmp.setup({
-  snippet = {
-    expand = function(args)
-      luasnip.lsp_expand(args.body)
-    end,
-  },
-  mapping = cmp.mapping.preset.insert({
-    ["<C-Space>"] = cmp.mapping.complete(),
-    ["<CR>"] = cmp.mapping.confirm({ select = true }),
-    ["<Tab>"] = cmp.mapping(function(fallback)
-      if cmp.visible() then
-        cmp.select_next_item()
-      elseif luasnip.expand_or_jumpable() then
-        luasnip.expand_or_jump()
-      else
-        fallback()
-      end
-    end, { "i", "s" }),
-  }),
-  sources = cmp.config.sources({
-    { name = "nvim_lsp" },
-    { name = "luasnip" },
-    { name = "buffer" },
-    { name = "path" },
-  }),
-})
 
 -- Copilot panel shortcut
 vim.keymap.set("n", "<leader>p", function()

@@ -9,9 +9,32 @@ set -e  # Exit on any error
 
 # Process arguments
 QUIET_MODE=0
-if [ "$1" = "--quiet" ] || [ "$1" = "-q" ]; then
-  QUIET_MODE=1
-  shift
+SHOW_HELP=0
+
+for arg in "$@"; do
+  case "$arg" in
+    --quiet|-q)
+      QUIET_MODE=1
+      ;;
+    --help|-h)
+      SHOW_HELP=1
+      ;;
+  esac
+done
+
+# Show help if requested
+if [ "$SHOW_HELP" -eq 1 ]; then
+  echo "Usage: $0 [options]"
+  echo
+  echo "Options:"
+  echo "  --quiet, -q     Run in quiet mode with minimal output"
+  echo "  --help, -h      Show this help message"
+  echo
+  echo "Description:"
+  echo "  This script installs language servers and linters used by Neovim."
+  echo "  It reads configuration from $HOME/.config/nvim/config/languages.lua"
+  echo "  and uses Mason, Homebrew, npm, gem, etc. as needed."
+  exit 0
 fi
 
 # Check if script is run in a terminal that supports colors
@@ -48,32 +71,96 @@ else
   }
 fi
 
-# Language servers extracted from init.lua
-LANGUAGE_SERVERS=(
-  # From mason-lspconfig ensure_installed (line 174-181)
-  "lua_ls"         # Lua language server
-  "rust_analyzer"  # Rust language server
-  "pyright"        # Python language server
-  "ruby_ls"        # Ruby language server
-  "tsserver"       # TypeScript/JavaScript language server
-  "html"           # HTML language server
-  "cssls"          # CSS language server
-  "jsonls"         # JSON language server
-  "taplo"          # TOML language server
-  "yamlls"         # YAML language server
-  "luau_lsp"       # Luau language server
-  "bashls"         # Bash language server
-)
+# Extract language servers and linters from the shared config file
+CONFIG_FILE="$HOME/.config/nvim/config/languages.lua"
 
-# Linters referenced in init.lua (line 193-200)
-LINTERS=(
-  "luacheck"  # Lua linter
-  "pylint"    # Python linter
-  "mypy"      # Python type checker
-  "eslint"    # JavaScript/TypeScript linter
-  "rubocop"   # Ruby linter
-  "clippy"    # Rust linter
-)
+if [ ! -f "$CONFIG_FILE" ]; then
+  echo "Error: Config file $CONFIG_FILE not found"
+  echo
+  echo "Please make sure the configuration file exists. This file contains"
+  echo "the list of language servers and linters that need to be installed."
+  echo
+  echo "You can create it by running:"
+  echo "  mkdir -p $HOME/.config/nvim/config"
+  echo "  touch $HOME/.config/nvim/config/languages.lua"
+  echo
+  echo "And then add the necessary configuration."
+  exit 1
+fi
+
+# Function to extract arrays from Lua config
+extract_lua_array() {
+  local array_name="$1"
+  local temp_file
+  temp_file=$(mktemp)
+  
+  # Create a small Lua script to print the array contents
+  cat > "$temp_file" << EOF
+local config = dofile('$CONFIG_FILE')
+for _, item in ipairs(config.$array_name) do
+  print(item)
+end
+EOF
+  
+  # Run the script with Lua and capture output
+  if command_exists lua; then
+    lua "$temp_file"
+  else
+    # Fallback to using Neovim's Lua interpreter if lua isn't available
+    nvim --headless -l "$temp_file" -c "q" 2>/dev/null
+  fi
+  
+  rm "$temp_file"
+}
+
+# Function to get installation method for a server or linter
+get_install_method() {
+  local item_type="$1"  # "server" or "linter"
+  local item_name="$2"
+  local method="$3"     # "mason", "brew", "npm", etc.
+  
+  local table_name=""
+  if [ "$item_type" = "server" ]; then
+    table_name="server_install_info"
+  else
+    table_name="linter_install_info"
+  fi
+  
+  local temp_file
+  temp_file=$(mktemp)
+  
+  # Create a small Lua script to get the installation method
+  cat > "$temp_file" << EOF
+local config = dofile('$CONFIG_FILE')
+local item_info = config.${table_name}['$item_name']
+if item_info and item_info['$method'] then
+  print(item_info['$method'])
+end
+EOF
+  
+  # Run the script with Lua and capture output
+  local result=""
+  if command_exists lua; then
+    result=$(lua "$temp_file")
+  else
+    # Fallback to using Neovim's Lua interpreter if lua isn't available
+    result=$(nvim --headless -l "$temp_file" -c "q" 2>/dev/null)
+  fi
+  
+  rm "$temp_file"
+  echo "$result"
+}
+
+# Extract language servers and linters
+LANGUAGE_SERVERS=()
+while read -r server; do
+  LANGUAGE_SERVERS+=("$server")
+done < <(extract_lua_array "language_servers")
+
+LINTERS=()
+while read -r linter; do
+  LINTERS+=("$linter")
+done < <(extract_lua_array "linters")
 
 # Track installed and failed items
 INSTALLED_SERVERS=()
@@ -93,241 +180,307 @@ run_install_command() {
   local display_name="$3"
   
   echo "Installing $display_name with $cmd_prefix..."
-  if $cmd_prefix $cmd_args; then
+  if $cmd_prefix "$cmd_args"; then
     return 0
   else
     return 1
   fi
 }
 
-# Check if a language server is already installed
-is_language_server_installed() {
-  local server="$1"
-  local mason_path="$HOME/.local/share/nvim/mason/bin"
+# Check if a package is already installed
+is_package_installed() {
+  local package_type="$1"  # "server" or "linter"
+  local package_name="$2"
   
   # Check if available through Mason
-  if [ -f "$mason_path/$server" ]; then
+  local mason_path="$HOME/.local/share/nvim/mason/bin"
+  local mason_package_name
+  
+  if [ "$package_type" = "server" ]; then
+    mason_package_name=$(get_install_method "server" "$package_name" "mason")
+  else
+    mason_package_name=$(get_install_method "linter" "$package_name" "mason")
+  fi
+  
+  # Check if the binary exists in Mason
+  if [ -n "$mason_package_name" ] && [ -f "$mason_path/$mason_package_name" ]; then
     return 0
   fi
   
-  # Check common executables based on server name
-  case "$server" in
-    "lua_ls")
-      command_exists lua-language-server && return 0 ;;
-    "rust_analyzer")
-      command_exists rust-analyzer && return 0 ;;
-    "pyright")
-      command_exists pyright && return 0 ;;
-    "tsserver")
-      command_exists typescript-language-server && return 0 ;;
-    "bashls")
-      command_exists bash-language-server && return 0 ;;
-    "luau_lsp")
-      command_exists luau-lsp && return 0 ;;
-    "taplo")
-      command_exists taplo && return 0 ;;
-    "yaml-language-server")
-      command_exists yaml-language-server && return 0 ;;
-  esac
+  # Check if the package directory exists in Mason
+  if [ -n "$mason_package_name" ] && [ -d "$HOME/.local/share/nvim/mason/packages/$mason_package_name" ]; then
+    return 0
+  fi
+  
+  # Special case for linters
+  if [ "$package_type" = "linter" ]; then
+    if command_exists "$package_name"; then
+      return 0
+    fi
+    
+    # Special check for clippy
+    if [ "$package_name" = "clippy" ] && command_exists rustup && rustup component list | grep -q "clippy.*installed"; then
+      return 0
+    fi
+  fi
+  
+  # For servers, check common executable names
+  if [ "$package_type" = "server" ]; then
+    case "$package_name" in
+      "lua_ls")
+        command_exists lua-language-server && return 0 ;;
+      "rust_analyzer")
+        command_exists rust-analyzer && return 0 ;;
+      "pyright")
+        command_exists pyright && return 0 ;;
+      "tsserver")
+        command_exists typescript-language-server && return 0 ;;
+      "bashls")
+        command_exists bash-language-server && return 0 ;;
+      "luau_lsp")
+        command_exists luau-lsp && return 0 ;;
+      "taplo")
+        command_exists taplo && return 0 ;;
+      "yamlls")
+        command_exists yaml-language-server && return 0 ;;
+    esac
+  fi
   
   # Default to not installed
   return 1
 }
 
-# Install language server
-install_language_server() {
-  local server="$1"
+# Generic function to install a package (server or linter)
+install_package() {
+  local package_type="$1"  # "server" or "linter"
+  local package_name="$2"
+  local tracking_list_name="$3"  # Variable name for tracking list (referenced by name)
+  local failed_list_name="$4"    # Variable name for failed list (referenced by name)
+  
+  # Get references to the actual arrays
+  local -n installed_list="$tracking_list_name"
+  local -n failed_list="$failed_list_name"
+  
   if [ $QUIET_MODE -eq 0 ]; then
-    colored_echo "\n${BOLD}=== Installing $server ===${RESET}"
+    colored_echo "\n${BOLD}=== Installing $package_type: $package_name ===${RESET}"
   fi
   
-  # Add server to installed list preemptively
-  INSTALLED_SERVERS+=("$server")
+  # Add package to installed list preemptively
+  installed_list+=("$package_name")
   
   # Check if already installed
-  if is_language_server_installed "$server"; then
+  if is_package_installed "$package_type" "$package_name"; then
     if [ $QUIET_MODE -eq 0 ]; then
-      colored_echo "${GREEN}$server is already installed${RESET}"
+      colored_echo "${GREEN}$package_name is already installed${RESET}"
     fi
     return 0
   fi
-  
-  # Try different installation methods based on server
-  case "$server" in
-    "lua_ls")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_with_mason "$server" "lua-language-server" && return 0
-      elif command_exists brew; then
-        run_install_command "brew" "install lua-language-server" "lua-language-server" && return 0
-      elif command_exists npm; then
-        run_install_command "npm" "install -g @lua-language-server/lua-language-server" "lua-language-server" && return 0
-      fi
-      ;;
-      
-    "rust_analyzer")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_with_mason "$server" "rust-analyzer" && return 0
-      elif command_exists brew; then
-        echo "Installing rust-analyzer with Homebrew..."
-        brew install rust-analyzer && return 0
-      elif command_exists rustup; then
-        echo "Installing rust-analyzer with rustup..."
-        rustup component add rust-analyzer && return 0
-      fi
-      ;;
-      
-    "pyright")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_with_mason "$server" "pyright" && return 0
-      elif command_exists brew; then
-        echo "Installing pyright with Homebrew..."
-        brew install pyright && INSTALLED_SERVERS+=("$server") && return 0
-      elif command_exists npm; then
-        echo "Installing pyright with npm..."
-        npm install -g pyright && INSTALLED_SERVERS+=("$server") && return 0
-      fi
-      ;;
-      
-    "ruby_ls")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_with_mason "$server" "ruby-lsp" && return 0
-      elif command_exists gem; then
-        echo "Installing ruby-lsp with gem..."
-        gem install ruby-lsp && INSTALLED_SERVERS+=("$server") && return 0
-      fi
-      ;;
-      
-    "tsserver")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_with_mason "$server" "typescript-language-server" && return 0
-      elif command_exists npm; then
-        echo "Installing typescript-language-server with npm..."
-        npm install -g typescript typescript-language-server && INSTALLED_SERVERS+=("$server") && return 0
-      fi
-      ;;
-      
-    "html")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_with_mason "$server" "html-lsp" && return 0
-      elif command_exists npm; then
-        echo "Installing vscode-langservers-extracted with npm..."
-        npm install -g vscode-langservers-extracted && INSTALLED_SERVERS+=("$server") && return 0
-      fi
-      ;;
 
-    "cssls")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_with_mason "$server" "css-lsp" && return 0
-      elif command_exists npm; then
-        echo "Installing vscode-langservers-extracted with npm..."
-        npm install -g vscode-langservers-extracted && INSTALLED_SERVERS+=("$server") && return 0
-      fi
-      ;;
-
-    "jsonls")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_with_mason "$server" "json-lsp" && return 0
-      elif command_exists npm; then
-        echo "Installing vscode-langservers-extracted with npm..."
-        npm install -g vscode-langservers-extracted && INSTALLED_SERVERS+=("$server") && return 0
-      fi
-      ;;
-      
-    "taplo")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_with_mason "$server" "taplo" && return 0
-      elif command_exists brew; then
-        echo "Installing taplo-cli with Homebrew..."
-        brew install taplo-cli && INSTALLED_SERVERS+=("$server") && return 0
-      elif command_exists cargo; then
-        echo "Installing taplo-cli with cargo..."
-        cargo install taplo-cli && INSTALLED_SERVERS+=("$server") && return 0
-      fi
-      ;;
-      
-    "yamlls")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_with_mason "$server" "yaml-language-server" && return 0
-      elif command_exists npm; then
-        echo "Installing yaml-language-server with npm..."
-        npm install -g yaml-language-server && INSTALLED_SERVERS+=("$server") && return 0
-      fi
-      ;;
-      
-    "luau_lsp")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_with_mason "$server" "luau-lsp" && return 0
-      elif command_exists git && command_exists cmake; then
-        echo "Building luau-lsp from GitHub with CMake..."
-        
-        # Create a temporary directory
-        local temp_dir
-        temp_dir=$(mktemp -d)
-        cd "$temp_dir" || {
-          echo "Failed to create or change to temporary directory"
-          return 1
-        }
-        
-        # Clone the repo
-        git clone https://github.com/JohnnyMorganz/luau-lsp.git
-        cd luau-lsp || {
-          echo "Failed to change to luau-lsp directory"
-          return 1
-        }
-        git checkout v1.40.0  # Latest release tag
-        
-        # Build following README instructions
-        mkdir build
-        cd build || {
-          echo "Failed to change to build directory"
-          return 1
-        }
-        cmake .. -DCMAKE_BUILD_TYPE=Release || {
-          echo "Failed to run cmake configuration"
-          return 1
-        }
-        cmake --build . --target Luau.LanguageServer.CLI --config Release || {
-          echo "Failed to build Luau.LanguageServer.CLI"
-          return 1
-        }
-        
-        # Install to a location in PATH
-        if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
-          echo "Installing to /usr/local/bin/luau-lsp"
-          cp CLI/Luau.LanguageServer.CLI /usr/local/bin/luau-lsp
-        elif [ -d "$HOME/.local/bin" ]; then
-          echo "Installing to $HOME/.local/bin/luau-lsp"
-          mkdir -p "$HOME/.local/bin"
-          cp CLI/Luau.LanguageServer.CLI "$HOME/.local/bin/luau-lsp"
-        else
-          echo "Installing to current working directory"
-          cp CLI/Luau.LanguageServer.CLI "$HOME/luau-lsp"
-          echo "You should move $HOME/luau-lsp to a directory in your PATH"
+  # Try Mason installation first if available
+  if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
+    local mason_name
+    mason_name=$(get_install_method "$package_type" "$package_name" "mason")
+    if [ -n "$mason_name" ]; then
+      if [ "$package_type" = "server" ]; then
+        if install_with_mason "$package_name" "$mason_name"; then
+          return 0
         fi
-        
-        # Clean up
-        cd "$OLDPWD"
-        rm -rf "$temp_dir"
-        
-        INSTALLED_SERVERS+=("$server") && return 0
+      else
+        if install_linter_with_mason "$package_name" "$mason_name"; then
+          return 0
+        fi
       fi
-      ;;
-      
-    "bashls")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_with_mason "$server" "bash-language-server" && return 0
-      elif command_exists npm; then
-        echo "Installing bash-language-server with npm..."
-        npm install -g bash-language-server && INSTALLED_SERVERS+=("$server") && return 0
-      fi
-      ;;
-  esac
+    fi
+  fi
   
-  colored_echo "${RED}Failed to install $server - no suitable installation method found${RESET}"
+  # Try Homebrew installation if available
+  if command_exists brew; then
+    local brew_package
+    brew_package=$(get_install_method "$package_type" "$package_name" "brew")
+    if [ -n "$brew_package" ]; then
+      if [ $QUIET_MODE -eq 0 ]; then
+        echo "Installing $package_name with Homebrew..."
+      fi
+      if brew install "$brew_package"; then
+        return 0
+      fi
+    fi
+  fi
+
+  # Try npm installation if available
+  if command_exists npm; then
+    local npm_package
+    npm_package=$(get_install_method "$package_type" "$package_name" "npm")
+    if [ -n "$npm_package" ]; then
+      if [ $QUIET_MODE -eq 0 ]; then
+        echo "Installing $package_name with npm..."
+      fi
+      if npm install -g "$npm_package"; then
+        return 0
+      fi
+    fi
+  fi
+
+  # Try pip installation if available
+  if command_exists pip3; then
+    local pip_package
+    pip_package=$(get_install_method "$package_type" "$package_name" "pip")
+    if [ -n "$pip_package" ]; then
+      if [ $QUIET_MODE -eq 0 ]; then
+        echo "Installing $package_name with pip..."
+      fi
+      if pip3 install "$pip_package"; then
+        return 0
+      fi
+    fi
+  fi
+
+  # Try gem installation if available
+  if command_exists gem; then
+    local gem_package
+    gem_package=$(get_install_method "$package_type" "$package_name" "gem")
+    if [ -n "$gem_package" ]; then
+      if [ $QUIET_MODE -eq 0 ]; then
+        echo "Installing $package_name with gem..."
+      fi
+      if gem install "$gem_package"; then
+        return 0
+      fi
+    fi
+  fi
+
+  # Try cargo installation if available
+  if command_exists cargo; then
+    local cargo_package
+    cargo_package=$(get_install_method "$package_type" "$package_name" "cargo")
+    if [ -n "$cargo_package" ]; then
+      if [ $QUIET_MODE -eq 0 ]; then
+        echo "Installing $package_name with cargo..."
+      fi
+      if cargo install "$cargo_package"; then
+        return 0
+      fi
+    fi
+  fi
+
+  # Try luarocks installation if available
+  if command_exists luarocks; then
+    local luarocks_package
+    luarocks_package=$(get_install_method "$package_type" "$package_name" "luarocks")
+    if [ -n "$luarocks_package" ]; then
+      if [ $QUIET_MODE -eq 0 ]; then
+        echo "Installing $package_name with LuaRocks..."
+      fi
+      if luarocks install --local "$luarocks_package"; then
+        return 0
+      fi
+    fi
+  fi
+
+  # Try rustup installation if available
+  if command_exists rustup; then
+    local rustup_command
+    rustup_command=$(get_install_method "$package_type" "$package_name" "rustup")
+    if [ -n "$rustup_command" ]; then
+      if [ $QUIET_MODE -eq 0 ]; then
+        echo "Installing $package_name with rustup..."
+      fi
+      if rustup "$rustup_command"; then
+        return 0
+      fi
+    fi
+  fi
+
+  # Special case for GitHub installation (only for servers currently)
+  if [ "$package_type" = "server" ]; then
+    local github_repo
+    github_repo=$(get_install_method "server" "$package_name" "github")
+    if [ -n "$github_repo" ] && command_exists git; then
+      if [ $QUIET_MODE -eq 0 ]; then
+        echo "Installing $package_name from GitHub ($github_repo)..."
+      fi
+      
+      # Extract repo and tag/branch
+      local repo_url
+      local tag_or_branch
+      
+      # Parse GitHub repo#tag format
+      if [[ "$github_repo" == *"#"* ]]; then
+        repo_url="https://github.com/${github_repo%%#*}.git"
+        tag_or_branch="${github_repo#*#}"
+      else
+        repo_url="https://github.com/$github_repo.git"
+        tag_or_branch="main"
+      fi
+      
+      # Special case for luau_lsp
+      if [[ "$repo_url" == *"JohnnyMorganz/luau-lsp"* ]]; then
+        if command_exists cmake; then
+          local temp_dir
+          temp_dir=$(mktemp -d)
+          cd "$temp_dir" || {
+            echo "Failed to create or change to temporary directory"
+            return 1
+          }
+          
+          # Clone the repo
+          git clone "$repo_url"
+          cd luau-lsp || {
+            echo "Failed to change to luau-lsp directory"
+            return 1
+          }
+          git checkout "$tag_or_branch"
+          
+          # Build following README instructions
+          mkdir build
+          cd build || {
+            echo "Failed to change to build directory"
+            return 1
+          }
+          cmake .. -DCMAKE_BUILD_TYPE=Release || {
+            echo "Failed to run cmake configuration"
+            return 1
+          }
+          cmake --build . --target Luau.LanguageServer.CLI --config Release || {
+            echo "Failed to build Luau.LanguageServer.CLI"
+            return 1
+          }
+          
+          # Install to a location in PATH
+          if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
+            echo "Installing to /usr/local/bin/luau-lsp"
+            cp CLI/Luau.LanguageServer.CLI /usr/local/bin/luau-lsp
+          elif [ -d "$HOME/.local/bin" ]; then
+            echo "Installing to $HOME/.local/bin/luau-lsp"
+            mkdir -p "$HOME/.local/bin"
+            cp CLI/Luau.LanguageServer.CLI "$HOME/.local/bin/luau-lsp"
+          else
+            echo "Installing to current working directory"
+            cp CLI/Luau.LanguageServer.CLI "$HOME/luau-lsp"
+            echo "You should move $HOME/luau-lsp to a directory in your PATH"
+          fi
+          
+          # Clean up
+          cd "$OLDPWD"
+          rm -rf "$temp_dir"
+          
+          return 0
+        fi
+      fi
+    fi
+  fi
+  
+  colored_echo "${RED}Failed to install $package_name - no suitable installation method found${RESET}"
   # Remove from installed list since installation failed
-  INSTALLED_SERVERS=("${INSTALLED_SERVERS[@]/$server}")
-  FAILED_SERVERS+=("$server")
+  installed_list=("${installed_list[@]/$package_name}")
+  failed_list+=("$package_name")
   return 1
+}
+
+# Wrapper function for installing language servers
+install_language_server() {
+  local server="$1"
+  install_package "server" "$server" "INSTALLED_SERVERS" "FAILED_SERVERS"
 }
 
 # Install a linter using Mason
@@ -358,101 +511,10 @@ install_linter_with_mason() {
   fi
 }
 
-# Install linter
+# Wrapper function for installing linters
 install_linter() {
   local linter="$1"
-  if [ $QUIET_MODE -eq 0 ]; then
-    colored_echo "\n${BOLD}=== Installing linter: $linter ===${RESET}"
-  fi
-  
-  # Add linter to installed list preemptively
-  INSTALLED_LINTERS+=("$linter")
-  
-  # Check if already installed
-  if command_exists "$linter"; then
-    if [ $QUIET_MODE -eq 0 ]; then
-      colored_echo "${GREEN}$linter is already installed${RESET}"
-    fi
-    return 0
-  fi
-  
-  # Special case for clippy which is checked differently
-  if [ "$linter" = "clippy" ] && rustup component list | grep -q "clippy.*installed"; then
-    if [ $QUIET_MODE -eq 0 ]; then
-      colored_echo "${GREEN}clippy is already installed${RESET}"
-    fi
-    return 0
-  fi
-  
-  # Try different installation methods based on linter
-  case "$linter" in
-    "luacheck")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_linter_with_mason "$linter" "luacheck" && return 0
-      elif command_exists brew; then
-        echo "Installing luacheck with Homebrew..."
-        brew install luacheck && INSTALLED_LINTERS+=("$linter") && return 0
-      elif command_exists luarocks; then
-        echo "Installing luacheck with LuaRocks..."
-        luarocks install --local luacheck && INSTALLED_LINTERS+=("$linter") && return 0
-      fi
-      ;;
-      
-    "pylint")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_linter_with_mason "$linter" "pylint" && return 0
-      elif command_exists brew; then
-        echo "Installing pylint with Homebrew..."
-        brew install pylint && INSTALLED_LINTERS+=("$linter") && return 0
-      elif command_exists pip3; then
-        echo "Installing pylint with pip..."
-        pip3 install pylint && INSTALLED_LINTERS+=("$linter") && return 0
-      fi
-      ;;
-      
-    "mypy")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_linter_with_mason "$linter" "mypy" && return 0
-      elif command_exists brew; then
-        echo "Installing mypy with Homebrew..."
-        brew install mypy && INSTALLED_LINTERS+=("$linter") && return 0
-      elif command_exists pip3; then
-        echo "Installing mypy with pip..."
-        pip3 install mypy && INSTALLED_LINTERS+=("$linter") && return 0
-      fi
-      ;;
-      
-    "eslint")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_linter_with_mason "$linter" "eslint_d" && return 0
-      elif command_exists npm; then
-        echo "Installing eslint with npm..."
-        npm install -g eslint && INSTALLED_LINTERS+=("$linter") && return 0
-      fi
-      ;;
-      
-    "rubocop")
-      if command_exists nvim && [ -d "$HOME/.local/share/nvim/mason" ]; then
-        install_linter_with_mason "$linter" "rubocop" && return 0
-      elif command_exists gem; then
-        echo "Installing rubocop with gem..."
-        gem install rubocop && INSTALLED_LINTERS+=("$linter") && return 0
-      fi
-      ;;
-      
-    "clippy")
-      if command_exists rustup; then
-        echo "Installing clippy with rustup..."
-        rustup component add clippy && INSTALLED_LINTERS+=("$linter") && return 0
-      fi
-      ;;
-  esac
-  
-  colored_echo "${RED}Failed to install $linter - no suitable installation method found${RESET}"
-  # Remove from installed list since installation failed
-  INSTALLED_LINTERS=("${INSTALLED_LINTERS[@]/$linter}")
-  FAILED_LINTERS+=("$linter")
-  return 1
+  install_package "linter" "$linter" "INSTALLED_LINTERS" "FAILED_LINTERS"
 }
 
 # Check prerequisites
