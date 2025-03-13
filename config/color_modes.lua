@@ -16,7 +16,7 @@ function M.force_reset_syntax()
   -- Using plugin-based highlighting with no buffer/filetype dependencies
 
   -- Store current state
-  local was_gui_mode = not vim.g.terminal_app_mode
+  local was_gui_mode = not vim.g.basic_mode
 
   -- Disable treesitter highlighting when in basic mode
   if vim.fn.exists(":TSBufDisable") == 2 then
@@ -25,7 +25,7 @@ function M.force_reset_syntax()
 
   -- Set up for basic color mode
   vim.opt.termguicolors = false
-  vim.g.terminal_app_mode = true
+  vim.g.basic_mode = true
   vim.opt.background = "dark"
 
   -- Apply extensive 256-color terminal highlighting
@@ -178,23 +178,14 @@ function M.setup_commands()
     vim.g.explicit_mode_change = nil
   end, {})
 
-  -- Alias TerminalMode to BasicMode for clarity
-  vim.api.nvim_create_user_command("TerminalMode", function()
-    -- Mark that we're explicitly running the command
-    vim.g.explicit_mode_change = true
-    -- Force Terminal.app mode
-    vim.g.terminal_app_mode = true
-    M.force_reset_syntax()
-    -- Clear the flag
-    vim.g.explicit_mode_change = nil
-  end, {})
+  -- TerminalMode command removed (use BasicMode instead)
 
   -- GUI mode with true colors and TreeSitter
   vim.api.nvim_create_user_command("GUIMode", function()
     -- Mark that we're explicitly running the command
     vim.g.explicit_mode_change = true
     -- Enable GUI mode with tree-sitter
-    vim.g.terminal_app_mode = false
+    vim.g.basic_mode = false
     vim.opt.termguicolors = true
     -- Make sure the colorscheme is available by checking if the plugin path exists
     local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/little-wonder")
@@ -253,7 +244,7 @@ function M.setup_autocmds()
           vim.notify = function() end
 
           -- Apply GUI mode
-          vim.g.terminal_app_mode = false
+          vim.g.basic_mode = false
           vim.opt.termguicolors = true
           -- Make sure the colorscheme is available by checking if the plugin path exists
           local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/little-wonder")
@@ -268,7 +259,7 @@ function M.setup_autocmds()
           -- Set flag
           vim.g._init_colors_done = true
         end
-      elseif vim.g.terminal_app_mode then
+      elseif vim.g.basic_mode then
         -- Initial load
         if vim.v.event.source == "VimEnter" and not vim.g._init_colors_done then
           -- Disable notifications temporarily
@@ -296,7 +287,7 @@ function M.init()
   vim.opt.background = "dark"    -- Use dark mode for better contrast
 
   -- Create a global variable to track which mode we're in
-  vim.g.terminal_app_mode = true
+  vim.g.basic_mode = true
 
   -- Setup autocmds and commands
   M.setup_autocmds()

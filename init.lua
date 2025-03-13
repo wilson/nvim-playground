@@ -55,7 +55,7 @@ function init.basic_setup()
 end
 
 -- Setup basic color mode
-function init.setup_terminal_app_mode()
+function init.setup_basic_mode()
   -- Load the color modes module and initialize it
   local ok, color_modes = pcall(require, "config.color_modes")
   if ok then
@@ -65,7 +65,7 @@ function init.setup_terminal_app_mode()
     vim.notify("Failed to load color_modes module. Using fallback settings.", vim.log.levels.WARN)
     vim.opt.termguicolors = false
     vim.opt.background = "dark"
-    vim.g.terminal_app_mode = true
+    vim.g.basic_mode = true
   end
 end
 
@@ -74,8 +74,8 @@ function init.setup()
   -- Basic settings first
   init.basic_setup()
 
-  -- Initialize terminal compatibility mode
-  init.setup_terminal_app_mode()
+  -- Initialize basic color mode
+  init.setup_basic_mode()
 
   -- Default leader key
   vim.g.mapleader = " "
@@ -115,8 +115,8 @@ function init.setup()
       lazy = false,
       priority = 1000, -- Load before other plugins
       config = function()
-        -- Only set colorscheme in GUI mode (not Terminal.app mode)
-        if not vim.g.terminal_app_mode then
+        -- Only set colorscheme in GUI mode (not Basic mode)
+        if not vim.g.basic_mode then
           vim.opt.termguicolors = true
           -- Make sure the colorscheme is available by checking if the plugin path exists
           local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/little-wonder")
@@ -369,7 +369,7 @@ function init.setup()
       "Neovim settings:",
       "  termguicolors: " .. tostring(vim.opt.termguicolors:get()),
       "  GUI environment: " .. gui_status,
-      "  Terminal app mode: " .. tostring(vim.g.terminal_app_mode or "Not set"),
+      "  Basic mode: " .. tostring(vim.g.basic_mode or "Not set"),
       "  Vim version: " .. vim.version().major .. "." .. vim.version().minor .. "." .. vim.version().patch,
     }
   end
@@ -396,7 +396,7 @@ function init.setup()
     table.insert(ts_status, "TreeSitter:")
     table.insert(ts_status, "  Installed: Yes")
     table.insert(ts_status, "  Parsers installed: " .. #installed)
-    table.insert(ts_status, "  Highlighting enabled: " .. tostring(not vim.g.terminal_app_mode))
+    table.insert(ts_status, "  Highlighting enabled: " .. tostring(not vim.g.basic_mode))
 
     if #installed > 0 then
       table.insert(ts_status, "")
@@ -538,12 +538,12 @@ function init.setup()
     else
       vim.api.nvim_buf_set_lines(buf, -1, -1, false, {
         "",
-        "Recommendations for Terminal.app:",
+        "Recommendations for Basic Mode:",
         "  1. Use :BasicMode to apply enhanced 256-color mode that works in any modern terminal",
-        "  2. Make sure termguicolors is OFF in basic mode for maximum compatibility",
+        "  2. Make sure termguicolors is OFF in Basic mode for maximum compatibility",
         "  3. This config uses the full 256-color palette for vibrant syntax highlighting",
         "  4. Consider using iTerm2 or Alacritty for even better color support",
-        "  5. If using Terminal.app, go to Preferences > Profiles > [Your Profile] > Advanced",
+        "  5. If using macOS Terminal, go to Preferences > Profiles > [Your Profile] > Advanced",
         "     and ensure 'Report Terminal Type' is set to xterm-256color"
       })
     end
