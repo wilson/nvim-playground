@@ -99,7 +99,18 @@ lazy.setup({
       require("nvim-treesitter.configs").setup({
         auto_install = false,
         sync_install = true, -- Install parsers synchronously
-        ensure_installed = { "lua", "rust", "vim", "vimdoc", "c", "query", "markdown", "markdown_inline" },
+        ensure_installed = {
+          -- Programming languages
+          "lua", "rust", "python", "ruby", "javascript", "typescript", "html", "css",
+          -- Config file formats
+          "json", "toml", "yaml", "xml",
+          -- Documentation formats
+          "markdown", "markdown_inline",
+          -- Vim/Neovim specific formats
+          "vim", "vimdoc", "query",
+          -- Core languages
+          "c", "bash"
+        },
 
         highlight = {
           enable = true,
@@ -160,7 +171,14 @@ lazy.setup({
           local mason_lspconfig_ok, mason_lspconfig = pcall(function() return require("mason-lspconfig") end)
           if mason_lspconfig_ok then
             mason_lspconfig.setup({
-              ensure_installed = { "lua_ls", "rust_analyzer", "luau_lsp" },
+              ensure_installed = {
+                -- Programming languages
+                "lua_ls", "rust_analyzer", "pyright", "ruby_ls", "tsserver", "html", "cssls",
+                -- Config file formats
+                "jsonls", "taplo", "yamlls",
+                -- Additional specialized servers
+                "luau_lsp", "bashls"
+              },
               automatic_installation = true,
             })
           end
@@ -174,6 +192,11 @@ lazy.setup({
           if lint_ok then
             lint.linters_by_ft = {
               lua = {"luacheck"},
+              python = {"pylint", "mypy"},
+              javascript = {"eslint"},
+              typescript = {"eslint"},
+              ruby = {"rubocop"},
+              rust = {"clippy"}
             }
             -- Run linter on save
             vim.api.nvim_create_autocmd({ "BufWritePost" }, {
@@ -258,10 +281,47 @@ lazy.setup({
     end,
   },
 
-  -- GitHub Copilot 
+  -- GitHub Copilot
   {
     "github/copilot.vim",
     lazy = false, -- Load immediately to ensure it's properly recognized
+  },
+
+  -- Syntax highlighting plugins for basic mode
+  -- These will work well in both Terminal.app and GUI modes
+  {
+    "vim-python/python-syntax",
+    ft = "python",
+    init = function()
+      vim.g.python_highlight_all = 1
+    end,
+  },
+  {
+    "pangloss/vim-javascript",
+    ft = "javascript",
+  },
+  {
+    "HerringtonDarkholme/yats.vim",
+    ft = "typescript",
+  },
+  {
+    "vim-ruby/vim-ruby",
+    ft = "ruby",
+  },
+  {
+    "cespare/vim-toml",
+    ft = "toml",
+  },
+  {
+    "elzr/vim-json",
+    ft = "json",
+    init = function()
+      vim.g.vim_json_syntax_conceal = 0
+    end,
+  },
+  {
+    "othree/html5.vim",
+    ft = {"html", "xml"},
   },
 
 })
@@ -280,7 +340,10 @@ local cmp_nvim_lsp = vim.F.npcall(require, "cmp_nvim_lsp")
 local capabilities = cmp_nvim_lsp and cmp_nvim_lsp.default_capabilities() or {}
 
 -- Setup common LSP servers
-local servers = { "lua_ls", "rust_analyzer", "luau_lsp" }
+local servers = {
+  "lua_ls", "rust_analyzer", "pyright", "ruby_ls", "tsserver",
+  "html", "cssls", "jsonls", "taplo", "yamlls", "luau_lsp", "bashls"
+}
 for _, lsp in pairs(servers) do
   local ok, _ = pcall(function() return require("lspconfig." .. lsp) end)
   if ok then
