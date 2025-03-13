@@ -5,12 +5,21 @@
 
 -- Helper function to safely load the language configuration
 local function load_language_config()
-  local ok, config = pcall(require, "config.languages")
+  -- Always load directly from the absolute path
+  local config_dir = vim.fn.stdpath("config")
+  local languages_path = config_dir .. "/config/languages.lua"
+  local ok, result = pcall(function()
+    local chunk, err = loadfile(languages_path)
+    if not chunk then
+      error("Could not load " .. languages_path .. ": " .. (err or "unknown error"))
+    end
+    return chunk()
+  end)
   if not ok then
-    vim.notify("Failed to load language configuration: " .. (config or "unknown error"), vim.log.levels.WARN)
+    vim.notify("Failed to load language configuration: " .. (result or "unknown error"), vim.log.levels.WARN)
     return {}
   end
-  return config
+  return result
 end
 
 -- Define init module with functions for code organization
