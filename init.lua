@@ -75,10 +75,18 @@ function init.setup_terminal_app_mode()
     syntax clear
     hi clear
 
-    " Set basic readable colors for startup
+    " Set minimal readable colors for startup
+    " The full colorscheme will be applied later
     hi Normal ctermfg=7 ctermbg=0
     hi Statement ctermfg=1 cterm=bold
-    hi Comment ctermfg=8
+    hi Comment ctermfg=8 cterm=italic
+    " Set our color adjustments early
+    hi Keyword ctermfg=6 cterm=bold
+    hi Directory ctermfg=12
+    hi Constant ctermfg=5 cterm=bold
+    hi Number ctermfg=5
+    hi Boolean ctermfg=5 cterm=bold
+    hi String ctermfg=2
 
     " Redraw to prevent flash of unstyled content
     redraw
@@ -114,69 +122,38 @@ lazy.setup({
       "nvim-treesitter/nvim-treesitter-textobjects",
     },
     config = function()
-      -- No termguicolors setting here - handled globally
-
-      -- Force standard vim syntax on firs
+      -- Force standard vim syntax
       vim.cmd("syntax on")
       vim.cmd("syntax enable")
 
-      -- Configure treesitter with optimized settings
+      -- Get language configuration
       local lang_config = load_language_config()
-      -- Check for headless mode - don't install parsers in headless mode
+      -- Check headless mode
       local is_headless = #vim.api.nvim_list_uis() == 0
-      -- Detect if parsers are already installed
-      local parser_dir = vim.api.nvim_get_runtime_file('parser', true)[1]
-      local parser_exists = function(lang)
-        local parser_path = parser_dir and (parser_dir .. '/' .. lang .. '.so')
-        return parser_path and vim.loop.fs_stat(parser_path) ~= nil
-      end
-      -- In headless mode, only log that we're skipping installation
-      if is_headless then
-        vim.defer_fn(function()
-          vim.notify("Skipping Treesitter parser installation in headless mode", vim.log.levels.INFO)
-        end, 1000)
-      end
-      -- Filter out already installed parsers
+      -- Skip parser installation in headless mode
       local parsers_to_install = {}
       if not is_headless and lang_config.treesitter_parsers then
-        for _, lang in ipairs(lang_config.treesitter_parsers) do
-          if not parser_exists(lang) then
-            table.insert(parsers_to_install, lang)
-          end
-        end
-        if #parsers_to_install > 0 then
-          vim.defer_fn(function()
-            vim.notify("Installing " .. #parsers_to_install .. " treesitter parsers", vim.log.levels.INFO)
-          end, 1000)
-        else
-          vim.defer_fn(function()
-            vim.notify("All treesitter parsers already installed", vim.log.levels.INFO)
-          end, 1000)
-        end
+        -- Get parsers that need installation
+        parsers_to_install = lang_config.treesitter_parsers
       end
+
+      -- Configure treesitter
       require("nvim-treesitter.configs").setup({
         auto_install = false,
-        sync_install = not is_headless, -- Only sync install in regular mode, not headless
-        ensure_installed = not is_headless and (#parsers_to_install > 0 and parsers_to_install or {}) or {},
+        sync_install = not is_headless,
+        ensure_installed = not is_headless and parsers_to_install or {},
 
         highlight = {
           enable = true,
-          -- This allows either treesitter or vim regex highlighting to work based on environment
           additional_vim_regex_highlighting = true,
-
-          -- Terminal.app compatibility - use treesitter only in GUI/capable terminals
-          -- Disable treesitter highlighting when in Terminal.app mode
-          disable = function(_, _)
-            return vim.g.terminal_app_mode
-          end,
+          -- Disable treesitter highlighting in terminal mode
+          disable = function() return vim.g.terminal_app_mode end,
         },
 
         -- Better indentation with treesitter
-        indent = {
-          enable = true
-        },
+        indent = { enable = true },
 
-        -- Enable incremental selection based on the named nodes from the grammar
+        -- Enable incremental selection
         incremental_selection = {
           enable = true,
           keymaps = {
@@ -187,8 +164,6 @@ lazy.setup({
           },
         },
       })
-
-      -- No need for TSPlayground command anymore
     end,
   },
 
@@ -569,32 +544,26 @@ local function force_reset_syntax()
   -- Use lw-rubber for basic color mode too (with cterm colors)
   vim.cmd("colorscheme lw-rubber")
 
-  -- Apply optimized ANSI colors for basic terminals
+  -- Only override the problematic blue colors while letting lw-rubber handle the rest
   vim.cmd([[
-    " Basic ANSI color definitions
-    hi Normal     ctermfg=7  ctermbg=0
-    hi Comment    ctermfg=8  cterm=italic
-    hi Statement  ctermfg=1  cterm=bold
-    hi Function   ctermfg=2  cterm=bold
-    hi String     ctermfg=2
-    hi Constant   ctermfg=5
-    hi Special    ctermfg=3
-    hi Identifier ctermfg=6
-    hi Type       ctermfg=3  cterm=bold
-    hi PreProc    ctermfg=5
-    hi Number     ctermfg=5
-    hi Boolean    ctermfg=5
-    hi Error      ctermfg=15 ctermbg=1
-    hi Todo       ctermfg=0  ctermbg=3
-    hi MatchParen ctermfg=0  ctermbg=3
-    hi Search     ctermfg=0  ctermbg=11
-    hi Visual     ctermbg=8
-    hi Keyword    ctermfg=4  cterm=bold
-    hi Directory  ctermfg=4
-
-    " Enable syntax highlighting
+    " Enable syntax highlighting first to let lw-rubber define most colors
     syntax on
     syntax enable
+    " Only override colors that are hard to see on dark backgrounds
+    " These overrides target elements that would typically use dark blue (color 4)
+    hi Keyword    ctermfg=6  cterm=bold     " Changed from blue(4) to cyan(6) for better visibility
+    hi Directory  ctermfg=12                " Changed from blue(4) to bright blue(12) for better visibility
+    hi Function   cterm=bold                " Add bold to make functions stand out
+    hi Statement  cterm=bold                " Add bold to make statements stand out
+    hi Type       cterm=bold                " Add bold to make types stand out
+    " Ensure constants are visible with distinct colors
+    hi Constant   ctermfg=5  cterm=bold     " Magenta with bold for constants
+    hi Number     ctermfg=5                 " Magenta for numbers
+    hi Boolean    ctermfg=5  cterm=bold     " Magenta with bold for booleans
+    hi Float      ctermfg=5                 " Magenta for floating point
+    hi String     ctermfg=2                 " Green for strings
+    " Forcibly set Comment to maintain italic
+    hi Comment    cterm=italic
   ]])
 
   -- Let plugin-based highlighting take over
@@ -716,7 +685,7 @@ local function add_color_test_blocks(buf)
     "#CC0000", -- Red
     "#4E9A06", -- Green
     "#C4A000", -- Yellow/Brown
-    "#3465A4", -- Blue
+    "#3465A4", -- Blue (Note: We avoid using this directly in terminal mode)
     "#75507B", -- Magenta
     "#06989A", -- Cyan
     "#D3D7CF", -- White/Light gray
@@ -725,7 +694,7 @@ local function add_color_test_blocks(buf)
     "#EF2929", -- Bright red
     "#8AE234", -- Bright green
     "#FCE94F", -- Bright yellow
-    "#729FCF", -- Bright blue
+    "#729FCF", -- Bright blue (Better visibility on black background)
     "#AD7FA8", -- Bright magenta
     "#34E2E2", -- Bright cyan
     "#EEEEEC"  -- Bright white
@@ -813,8 +782,9 @@ vim.api.nvim_create_user_command("Diagnostics", function()
       "Recommendations for Terminal.app:",
       "  1. Use :BasicMode to apply basic terminal colors that work in any terminal",
       "  2. Make sure termguicolors is OFF in basic mode",
-      "  3. Consider using iTerm2 instead for better color support",
-      "  4. If using Terminal.app, go to Preferences > Profiles > [Your Profile] > Advanced",
+      "  3. Optimized blue colors: Keywords use cyan (6), Directory uses bright blue (12) for visibility",
+      "  4. Consider using iTerm2 instead for better color support",
+      "  5. If using Terminal.app, go to Preferences > Profiles > [Your Profile] > Advanced",
       "     and ensure 'Report Terminal Type' is set to xterm-256color"
     })
   end
