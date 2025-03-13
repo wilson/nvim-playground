@@ -8,8 +8,8 @@ M.language_servers = {
   "lua_ls",         -- Lua language server
   "rust_analyzer",  -- Rust language server
   "pyright",        -- Python language server
-  "ruby_ls",        -- Ruby language server
-  "tsserver",       -- TypeScript/JavaScript language server
+  "ruby_lsp",       -- Ruby language server (was ruby_ls)
+  "vtsls",          -- TypeScript/JavaScript language server (was tsserver)
   "html",           -- HTML language server
   "cssls",          -- CSS language server
   "jsonls",         -- JSON language server
@@ -70,13 +70,13 @@ M.server_install_info = {
     brew = "pyright",
     npm = "pyright",
   },
-  ruby_ls = {
+  ruby_lsp = {
     mason = "ruby-lsp",
     gem = "ruby-lsp",
   },
-  tsserver = {
-    mason = "typescript-language-server",
-    npm = "typescript typescript-language-server",
+  vtsls = {
+    mason = "vtsls",
+    npm = "typescript @vtsls/language-server",
   },
   html = {
     mason = "html-lsp",

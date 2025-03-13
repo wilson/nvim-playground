@@ -113,14 +113,42 @@ lazy.setup({
 
       -- Configure treesitter with optimized settings
       local lang_config = load_language_config()
+      -- Check for headless mode - don't install parsers in headless mode
+      local is_headless = #vim.api.nvim_list_uis() == 0
+      -- Detect if parsers are already installed
+      local parser_dir = vim.api.nvim_get_runtime_file('parser', true)[1]
+      local parser_exists = function(lang)
+        local parser_path = parser_dir and (parser_dir .. '/' .. lang .. '.so')
+        return parser_path and vim.loop.fs_stat(parser_path) ~= nil
+      end
+      -- In headless mode, only log that we're skipping installation
+      if is_headless then
+        vim.defer_fn(function()
+          vim.notify("Skipping Treesitter parser installation in headless mode", vim.log.levels.INFO)
+        end, 1000)
+      end
+      -- Filter out already installed parsers
+      local parsers_to_install = {}
+      if not is_headless and lang_config.treesitter_parsers then
+        for _, lang in ipairs(lang_config.treesitter_parsers) do
+          if not parser_exists(lang) then
+            table.insert(parsers_to_install, lang)
+          end
+        end
+        if #parsers_to_install > 0 then
+          vim.defer_fn(function()
+            vim.notify("Installing " .. #parsers_to_install .. " treesitter parsers", vim.log.levels.INFO)
+          end, 1000)
+        else
+          vim.defer_fn(function()
+            vim.notify("All treesitter parsers already installed", vim.log.levels.INFO)
+          end, 1000)
+        end
+      end
       require("nvim-treesitter.configs").setup({
         auto_install = false,
-        sync_install = true, -- Install parsers synchronously
-        ensure_installed = lang_config.treesitter_parsers or {
-          -- Fallback parsers if config not available
-          "lua", "rust", "python", "javascript", "html", "css",
-          "json", "toml", "yaml", "vim", "bash"
-        },
+        sync_install = not is_headless, -- Only sync install in regular mode, not headless
+        ensure_installed = not is_headless and (#parsers_to_install > 0 and parsers_to_install or {}) or {},
 
         highlight = {
           enable = true,
@@ -181,8 +209,25 @@ lazy.setup({
           local mason_lspconfig_ok, mason_lspconfig = pcall(function() return require("mason-lspconfig") end)
           if mason_lspconfig_ok then
             local lang_config = load_language_config()
+            -- Filter out any servers that aren't available in mason-lspconfig
+            local available_servers = {}
+            -- Only try this if we can get the list
+            pcall(function()
+              local all_mason_servers = mason_lspconfig.get_available_servers()
+              local all_servers_set = {}
+              -- Convert to a set for faster lookup
+              for _, server in ipairs(all_mason_servers) do
+                all_servers_set[server] = true
+              end
+              -- Only include servers that are available
+              for _, server in ipairs(lang_config.language_servers or {}) do
+                if all_servers_set[server] then
+                  table.insert(available_servers, server)
+                end
+              end
+            end)
             mason_lspconfig.setup({
-              ensure_installed = lang_config.language_servers or {},
+              ensure_installed = available_servers,
               automatic_installation = true,
             })
           end
@@ -197,15 +242,19 @@ lazy.setup({
             local lang_config = load_language_config()
             -- Use the linters mapping from our shared config
             lint.linters_by_ft = lang_config.linters_by_ft or {}
-            -- Run linter on save
-            vim.api.nvim_create_autocmd({ "BufWritePost" }, {
-              callback = function()
-                local lint_mod = vim.F.npcall(require, "lint")
-                if lint_mod then
-                  lint_mod.try_lint()
-                end
-              end,
-            })
+            -- Only set up linting in non-headless mode
+            local is_headless = #vim.api.nvim_list_uis() == 0
+            if not is_headless then
+              -- Run linter on save
+              vim.api.nvim_create_autocmd({ "BufWritePost" }, {
+                callback = function()
+                  local lint_mod = vim.F.npcall(require, "lint")
+                  if lint_mod then
+                    lint_mod.try_lint()
+                  end
+                end,
+              })
+            end
           end
         end,
       },
@@ -335,6 +384,16 @@ vim.opt.cursorline = false
 
 local lsp = {}
 
+-- Helper function to set up a single LSP server
+function lsp.setup_server(lspconfig, _, server_name, capabilities)
+  local ok, _ = pcall(function() return require("lspconfig." .. server_name) end)
+  if ok then
+    lspconfig[server_name].setup({ capabilities = capabilities })
+  end
+  -- Silently continue if server is not available
+  -- We don't want to clutter the startup with warnings
+end
+
 -- Initialize LSP services
 function lsp.setup()
   local lspconfig = vim.F.npcall(require, "lspconfig")
@@ -350,11 +409,17 @@ function lsp.setup()
   local lang_config = load_language_config()
   local servers = lang_config.language_servers or {}
 
+  -- Server name mapping (for lspconfig vs mason-lspconfig differences)
+  local server_mapping = {
+    -- Map our servers to lspconfig server names
+    vtsls = "tsserver",      -- TypeScript server
+    ruby_lsp = "ruby_ls"     -- Ruby language server
+  }
+
   for _, server in pairs(servers) do
-    local ok, _ = pcall(function() return require("lspconfig." .. server) end)
-    if ok then
-      lspconfig[server].setup({ capabilities = capabilities })
-    end
+    -- Use the mapping if it exists, otherwise use the original server name
+    local server_name = server_mapping[server] or server
+    lsp.setup_server(lspconfig, server, server_name, capabilities)
   end
 
   -- Set up key mappings
@@ -466,6 +531,12 @@ vim.opt.background = "dark"   -- Use dark mode for better contras
 
 -- Basic mode function for terminals with limited color support
 local function force_reset_syntax()
+  -- Skip in headless mode
+  local is_headless = #vim.api.nvim_list_uis() == 0
+  if is_headless then
+    return
+  end
+
   -- Using plugin-based highlighting with no buffer/filetype dependencies
 
   -- Store current state
@@ -520,11 +591,13 @@ local function force_reset_syntax()
   -- Let plugin-based highlighting take over
   -- Enhanced plugins will provide better highlighting
 
-  -- Notify user about mode state
-  if was_gui_mode then
-    vim.notify("Switched from GUI mode to basic color mode", vim.log.levels.INFO)
-  else
-    vim.notify("Refreshed basic color mode", vim.log.levels.INFO)
+  -- Only notify if this was triggered by a user command, not during startup
+  if vim.v.vim_did_enter == 1 then
+    if was_gui_mode then
+      vim.notify("Switched from GUI mode to basic color mode", vim.log.levels.INFO)
+    else
+      vim.notify("Refreshed basic color mode", vim.log.levels.INFO)
+    end
   end
 end
 
@@ -769,7 +842,10 @@ vim.api.nvim_create_user_command("GUIMode", function()
   -- Fire an event that other code can hook into
   vim.api.nvim_exec_autocmds("User", { pattern = "GUIModeApplied" })
 
-  vim.notify("Switched to GUI mode with tree-sitter highlights", vim.log.levels.INFO)
+  -- Only notify after Vim is fully started
+  if vim.v.vim_did_enter == 1 then
+    vim.notify("Switched to GUI mode with tree-sitter highlights", vim.log.levels.INFO)
+  end
 end, {})
 
 -- Create augroups for color mode compatibility
@@ -778,7 +854,10 @@ vim.api.nvim_create_augroup("ColorModeSettings", { clear = true })
 -- Add a command to switch to basic color mode
 vim.api.nvim_create_user_command("BasicMode", function()
   pcall(force_reset_syntax)
-  vim.notify("Basic color mode applied", vim.log.levels.INFO)
+  -- Only notify after Vim is fully started
+  if vim.v.vim_did_enter == 1 then
+    vim.notify("Basic color mode applied", vim.log.levels.INFO)
+  end
 end, {})
 
 -- Function to set up autocmds
@@ -795,6 +874,11 @@ local function setup_autocmds()
   vim.api.nvim_create_autocmd({"VimEnter", "BufEnter", "ColorScheme"}, {
     group = "ColorModeSettings",
     callback = function()
+      -- Skip in headless mode
+      local is_headless = #vim.api.nvim_list_uis() == 0
+      if is_headless then
+        return
+      end
       -- Only apply basic color mode if we're in basic mode
       if vim.g.terminal_app_mode then
         pcall(force_reset_syntax)
