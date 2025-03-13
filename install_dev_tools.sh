@@ -1,5 +1,5 @@
 #!/bin/bash
-# 
+#
 # Install language servers and linters for Neovim setup
 # This script ensures all development tools referenced in your Neovim configuration are installed
 # It reads configuration from languages.lua and installs all servers and linters defined there
@@ -50,7 +50,7 @@ if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   YELLOW="\033[33m"
   BLUE="\033[34m"
   RESET="\033[0m"
-  
+
   # Function to print colored text
   colored_echo() {
     echo -e "$@"
@@ -63,7 +63,7 @@ else
   YELLOW=""
   BLUE=""
   RESET=""
-  
+
   # Function to print text without color
   colored_echo() {
     # Strip color codes when printing
@@ -100,7 +100,7 @@ extract_lua_array() {
   local array_name="$1"
   local temp_file
   temp_file=$(mktemp)
-  
+
   # Create a small Lua script to print the array contents
   cat > "$temp_file" << EOF
 local config = dofile('$CONFIG_FILE')
@@ -108,7 +108,7 @@ for _, item in ipairs(config.$array_name) do
   print(item)
 end
 EOF
-  
+
   # Run the script with Lua and capture output
   if command_exists lua; then
     lua "$temp_file"
@@ -116,7 +116,7 @@ EOF
     # Fallback to using Neovim's Lua interpreter if lua isn't available
     nvim --headless -l "$temp_file" -c "q" 2>/dev/null
   fi
-  
+
   rm "$temp_file"
 }
 
@@ -125,17 +125,17 @@ get_install_method() {
   local item_type="$1"  # "server" or "linter"
   local item_name="$2"
   local method="$3"     # "mason", "brew", "npm", etc.
-  
+
   local table_name=""
   if [ "$item_type" = "server" ]; then
     table_name="server_install_info"
   else
     table_name="linter_install_info"
   fi
-  
+
   local temp_file
   temp_file=$(mktemp)
-  
+
   # Create a small Lua script to get the installation method
   cat > "$temp_file" << EOF
 local config = dofile('$CONFIG_FILE')
@@ -144,7 +144,7 @@ if item_info and item_info['$method'] then
   print(item_info['$method'])
 end
 EOF
-  
+
   # Run the script with Lua and capture output
   local result=""
   if command_exists lua; then
@@ -153,7 +153,7 @@ EOF
     # Fallback to using Neovim's Lua interpreter if lua isn't available
     result=$(nvim --headless -l "$temp_file" -c "q" 2>/dev/null)
   fi
-  
+
   rm "$temp_file"
   echo "$result"
 }
@@ -182,7 +182,7 @@ run_install_command() {
   local cmd_prefix="$1"
   local cmd_args="$2"
   local display_name="$3"
-  
+
   echo "Installing $display_name with $cmd_prefix..."
   if $cmd_prefix "$cmd_args"; then
     return 0
@@ -195,39 +195,39 @@ run_install_command() {
 is_package_installed() {
   local package_type="$1"  # "server" or "linter"
   local package_name="$2"
-  
+
   # Check if available through Mason
   local mason_path="$HOME/.local/share/nvim/mason/bin"
   local mason_package_name
-  
+
   if [ "$package_type" = "server" ]; then
     mason_package_name=$(get_install_method "server" "$package_name" "mason")
   else
     mason_package_name=$(get_install_method "linter" "$package_name" "mason")
   fi
-  
+
   # Check if the binary exists in Mason
   if [ -n "$mason_package_name" ] && [ -f "$mason_path/$mason_package_name" ]; then
     return 0
   fi
-  
+
   # Check if the package directory exists in Mason
   if [ -n "$mason_package_name" ] && [ -d "$HOME/.local/share/nvim/mason/packages/$mason_package_name" ]; then
     return 0
   fi
-  
+
   # Special case for linters
   if [ "$package_type" = "linter" ]; then
     if command_exists "$package_name"; then
       return 0
     fi
-    
+
     # Special check for clippy
     if [ "$package_name" = "clippy" ] && command_exists rustup && rustup component list | grep -q "clippy.*installed"; then
       return 0
     fi
   fi
-  
+
   # For servers, check common executable names
   if [ "$package_type" = "server" ]; then
     case "$package_name" in
@@ -251,7 +251,7 @@ is_package_installed() {
         command_exists yaml-language-server && return 0 ;;
     esac
   fi
-  
+
   # Default to not installed
   return 1
 }
@@ -262,18 +262,18 @@ install_package() {
   local package_name="$2"
   local tracking_list_name="$3"  # Variable name for tracking list (without nameref)
   local failed_list_name="$4"    # Variable name for failed list (without nameref)
-  
+
   if [ $QUIET_MODE -eq 0 ]; then
     colored_echo "\n${BOLD}=== Installing $package_type: $package_name ===${RESET}"
   fi
-  
+
   # Add package to installed list preemptively
   if [ "$tracking_list_name" = "INSTALLED_SERVERS" ]; then
     INSTALLED_SERVERS+=("$package_name")
   elif [ "$tracking_list_name" = "INSTALLED_LINTERS" ]; then
     INSTALLED_LINTERS+=("$package_name")
   fi
-  
+
   # Check if already installed
   if is_package_installed "$package_type" "$package_name"; then
     if [ $QUIET_MODE -eq 0 ]; then
@@ -298,7 +298,7 @@ install_package() {
       fi
     fi
   fi
-  
+
   # Try Homebrew installation if available
   if command_exists brew; then
     local brew_package
@@ -405,11 +405,11 @@ install_package() {
       if [ $QUIET_MODE -eq 0 ]; then
         echo "Installing $package_name from GitHub ($github_repo)..."
       fi
-      
+
       # Extract repo and tag/branch
       local repo_url
       local tag_or_branch
-      
+
       # Parse GitHub repo#tag format
       if [[ "$github_repo" == *"#"* ]]; then
         repo_url="https://github.com/${github_repo%%#*}.git"
@@ -418,7 +418,7 @@ install_package() {
         repo_url="https://github.com/$github_repo.git"
         tag_or_branch="main"
       fi
-      
+
       # Special case for luau_lsp
       if [[ "$repo_url" == *"JohnnyMorganz/luau-lsp"* ]]; then
         if command_exists cmake; then
@@ -428,7 +428,7 @@ install_package() {
             echo "Failed to create or change to temporary directory"
             return 1
           }
-          
+
           # Clone the repo
           git clone "$repo_url"
           cd luau-lsp || {
@@ -436,7 +436,7 @@ install_package() {
             return 1
           }
           git checkout "$tag_or_branch"
-          
+
           # Build following README instructions
           mkdir build
           cd build || {
@@ -451,7 +451,7 @@ install_package() {
             echo "Failed to build Luau.LanguageServer.CLI"
             return 1
           }
-          
+
           # Install to a location in PATH
           if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
             echo "Installing to /usr/local/bin/luau-lsp"
@@ -465,17 +465,17 @@ install_package() {
             cp CLI/Luau.LanguageServer.CLI "$HOME/luau-lsp"
             echo "You should move $HOME/luau-lsp to a directory in your PATH"
           fi
-          
+
           # Clean up
           cd "$OLDPWD"
           rm -rf "$temp_dir"
-          
+
           return 0
         fi
       fi
     fi
   fi
-  
+
   colored_echo "${RED}Failed to install $package_name - no suitable installation method found${RESET}"
   # Remove from installed list since installation failed
   if [ "$tracking_list_name" = "INSTALLED_SERVERS" ]; then
@@ -489,7 +489,7 @@ install_package() {
       fi
     done
     INSTALLED_SERVERS=("${new_installed_servers[@]}")
-    
+
     # Add to failed list
     if [ "$failed_list_name" = "FAILED_SERVERS" ]; then
       FAILED_SERVERS+=("$package_name")
@@ -505,7 +505,7 @@ install_package() {
       fi
     done
     INSTALLED_LINTERS=("${new_installed_linters[@]}")
-    
+
     # Add to failed list
     if [ "$failed_list_name" = "FAILED_LINTERS" ]; then
       FAILED_LINTERS+=("$package_name")
@@ -524,7 +524,7 @@ install_language_server() {
 install_linter_with_mason() {
   local linter_name="$1"
   local mason_name="${2:-$linter_name}" # Use the provided mason name or default to linter name
-  
+
   echo "Installing $linter_name with Mason..."
   # Check if already installed by Mason
   if [ -f "$HOME/.local/share/nvim/mason/bin/$mason_name" ] || \
@@ -532,13 +532,13 @@ install_linter_with_mason() {
     colored_echo "${GREEN}$linter_name is already installed via Mason${RESET}"
     return 0
   fi
-  
+
   # Create temp file for nvim output
   local NVIM_OUTPUT
   NVIM_OUTPUT=$(mktemp)
   nvim --headless -c "MasonInstall $mason_name" -c "sleep 1500m" -c "qa" > "$NVIM_OUTPUT" 2>&1
   rm -f "$NVIM_OUTPUT"
-  
+
   # Check if installation was successful
   if [ -f "$HOME/.local/share/nvim/mason/bin/$mason_name" ] || \
      ls "$HOME/.local/share/nvim/mason/packages/$mason_name" &>/dev/null; then
@@ -558,29 +558,29 @@ install_linter() {
 check_prerequisites() {
   local missing=()
   local warnings=()
-  
+
   if ! command_exists brew; then
     missing+=("Homebrew (https://brew.sh/)")
   fi
-  
+
   if ! command_exists npm; then
     missing+=("Node.js and npm (brew install node)")
   fi
-  
+
   if ! command_exists cargo; then
     missing+=("Rust and Cargo (brew install rustup-init)")
   elif ! command_exists rustup; then
     warnings+=("rustup command not found, but cargo exists. Some Rust tools may not install correctly")
   fi
-  
+
   if ! command_exists pip3; then
     missing+=("Python and pip (brew install python)")
   fi
-  
+
   if ! command_exists gem; then
     missing+=("Ruby and gem (brew install ruby)")
   fi
-  
+
   # Display missing prerequisites
   if [ ${#missing[@]} -gt 0 ]; then
     colored_echo "${YELLOW}Missing prerequisites:${RESET}"
@@ -589,7 +589,7 @@ check_prerequisites() {
     done
     colored_echo "\n${YELLOW}Some language servers may not install correctly without these prerequisites.${RESET}"
     colored_echo "${YELLOW}Install them with Homebrew first for best results.${RESET}"
-    
+
     # Ask user if they want to continue anyway
     read -p "Continue anyway? (y/n) " -n 1 -r
     echo
@@ -598,7 +598,7 @@ check_prerequisites() {
       exit 1
     fi
   fi
-  
+
   # Display warnings
   if [ ${#warnings[@]} -gt 0 ]; then
     colored_echo "${YELLOW}Warnings:${RESET}"
@@ -607,14 +607,14 @@ check_prerequisites() {
     done
     echo
   fi
-  
+
   return 0
 }
 
 # Function to install TreeSitter parsers
 install_treesitter_parsers() {
   colored_echo "${BLUE}Installing TreeSitter parsers...${RESET}"
-  
+
   # Check if nvim exists
   if ! command_exists nvim; then
     echo -e "${YELLOW}Neovim not found. TreeSitter installation requires Neovim.${RESET}"
@@ -622,80 +622,50 @@ install_treesitter_parsers() {
     echo
     return 1
   fi
+
+  # Skip TreeSitter installation via scripting approach - it's too complex
+  # Instead load all parsers directly from the languages.lua file and install via native nvim commands
+  echo "Installing TreeSitter parsers..."
+
+  # Extract treesitter parsers from config
+  PARSERS=()
+  while read -r parser; do
+    PARSERS+=("$parser")
+  done < <(extract_lua_array "treesitter_parsers")
+
+  # Ensure nvim-treesitter is properly installed first
+  echo "Ensuring nvim-treesitter is installed..."
+  nvim --headless --noplugin --clean -c "packadd nvim-treesitter" -c "qa!" > /dev/null 2>&1 || true
   
-  # Create a temporary init.lua to install TreeSitter parsers
-  local TEMP_INIT
-  TEMP_INIT=$(mktemp)
-  cat > "$TEMP_INIT" << 'EOF'
--- Load language config
-local function load_config()
-  local ok, config = pcall(require, "config.languages")
-  return ok and config or { treesitter_parsers = {} }
-end
+  # Install each parser using nvim's command mode
+  for parser in "${PARSERS[@]}"; do
+    echo "Checking parser: $parser"
+    # Use an empty/minimal Neovim config for this
+    nvim --headless --noplugin --clean -c "packadd nvim-treesitter" -c "TSInstallSync! $parser" -c "qa!" > /dev/null 2>&1 || true
+  done
 
-local config = load_config()
+  echo "TreeSitter parsers installation completed."
 
--- Bootstrap lazy.nvim
-local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
-if not vim.loop.fs_stat(lazypath) then
-  print("Installing lazy.nvim...")
-  vim.fn.system({
-    "git",
-    "clone",
-    "--filter=blob:none",
-    "https://github.com/folke/lazy.nvim.git",
-    "--branch=stable",
-    lazypath,
-  })
-end
-vim.opt.rtp:prepend(lazypath)
-
--- Set leader key for lazy
-vim.g.mapleader = " "
-vim.g.maplocalleader = " "
-
--- Setup treesitter with our parsers
-require("lazy").setup({
-  {
-    "nvim-treesitter/nvim-treesitter",
-    config = function()
-      require("nvim-treesitter.configs").setup({
-        auto_install = false,
-        sync_install = true,
-        ensure_installed = config.treesitter_parsers or {},
-      })
-      
-      -- Force installation to complete
-      if config.treesitter_parsers then
-        for _, parser in ipairs(config.treesitter_parsers) do
-          vim.cmd("TSInstallSync " .. parser)
-        end
-      end
-      print("TreeSitter parsers have been installed!")
-    end
-  }
-})
-EOF
-
-  # Run Neovim with the temporary init.lua to install TreeSitter parsers
-  echo "Installing TreeSitter parsers for Neovim..."
-  local NVIM_OUTPUT
-  NVIM_OUTPUT=$(mktemp)
-  nvim --headless -u "$TEMP_INIT" -c "sleep 5000m" -c "qa" > "$NVIM_OUTPUT" 2>&1
+  # Check if parsers are installed - try multiple possible locations
+  local possible_dirs=(
+    "$HOME/.local/share/nvim/lazy/nvim-treesitter/parser"
+    "$HOME/.local/share/nvim/site/pack/*/start/nvim-treesitter/parser"
+    "$HOME/.local/share/nvim/site/pack/*/opt/nvim-treesitter/parser"
+  )
   
-  # Show any output
-  if [ $QUIET_MODE -eq 0 ]; then
-    grep -v "Warning" < "$NVIM_OUTPUT" | tail -n 20
-  fi
+  local found=false
+  for dir_pattern in "${possible_dirs[@]}"; do
+    # Use globbing to expand the pattern
+    for dir in $dir_pattern; do
+      if [ -d "$dir" ] && [ "$(ls -A "$dir" 2>/dev/null)" ]; then
+        colored_echo "${GREEN}TreeSitter parsers have been successfully installed in $dir.${RESET}"
+        found=true
+        break 2
+      fi
+    done
+  done
   
-  # Clean up
-  rm "$TEMP_INIT"
-  rm -f "$NVIM_OUTPUT"
-  
-  # Check if parsers are installed
-  local parsers_dir="$HOME/.local/share/nvim/lazy/nvim-treesitter/parser"
-  if [ -d "$parsers_dir" ] && [ "$(ls -A "$parsers_dir")" ]; then
-    colored_echo "${GREEN}TreeSitter parsers have been successfully installed.${RESET}"
+  if [ "$found" = true ]; then
     return 0
   else
     colored_echo "${RED}Failed to install TreeSitter parsers.${RESET}"
@@ -706,7 +676,7 @@ EOF
 # Function to bootstrap Mason if it's not already set up
 bootstrap_mason() {
   local mason_path="$HOME/.local/share/nvim/mason"
-  
+
   # Check if nvim exists
   if ! command_exists nvim; then
     echo -e "${YELLOW}Neovim not found. Mason installation requires Neovim.${RESET}"
@@ -714,15 +684,15 @@ bootstrap_mason() {
     echo
     return 1
   fi
-  
+
   # Check if Mason is already set up
   if [ -d "$mason_path" ] && [ -d "$mason_path/bin" ]; then
     colored_echo "${GREEN}Mason is already installed.${RESET}"
     return 0
   fi
-  
+
   colored_echo "${BLUE}Bootstrapping Mason for Neovim...${RESET}"
-  
+
   # Create a temporary init.lua to bootstrap Mason
   local TEMP_INIT
   TEMP_INIT=$(mktemp)
@@ -764,10 +734,10 @@ EOF
   NVIM_OUTPUT=$(mktemp)
   nvim --headless -u "$TEMP_INIT" -c "sleep 2000m" -c "qa" > "$NVIM_OUTPUT" 2>&1
   rm -f "$NVIM_OUTPUT"
-  
+
   # Clean up
   rm "$TEMP_INIT"
-  
+
   # Verify installation
   if [ -d "$mason_path" ]; then
     colored_echo "${GREEN}Mason has been successfully installed.${RESET}"
@@ -801,7 +771,7 @@ suppress_npm_messages() {
 install_with_mason() {
   local server_name="$1"
   local mason_name="${2:-$server_name}" # Use the provided mason name or default to server name
-  
+
   echo "Installing $server_name with Mason..."
   # Check if already installed by Mason
   if [ -f "$HOME/.local/share/nvim/mason/bin/$mason_name" ] || \
@@ -809,13 +779,13 @@ install_with_mason() {
     colored_echo "${GREEN}$server_name is already installed via Mason${RESET}"
     return 0
   fi
-  
+
   # Create temp file for nvim output
   local NVIM_OUTPUT
   NVIM_OUTPUT=$(mktemp)
   nvim --headless -c "MasonInstall $mason_name" -c "sleep 1500m" -c "qa" > "$NVIM_OUTPUT" 2>&1
   rm -f "$NVIM_OUTPUT"
-  
+
   # Check if installation was successful
   if [ -f "$HOME/.local/share/nvim/mason/bin/$mason_name" ] || \
      ls "$HOME/.local/share/nvim/mason/packages/$mason_name" &>/dev/null; then
@@ -833,24 +803,24 @@ main() {
     echo "Based on configuration in $HOME/.config/nvim/config/languages.lua"
     echo "Use --quiet or -q for less verbose output"
   fi
-  
+
   # Check prerequisites
   check_prerequisites
-  
+
   # Bootstrap Mason if needed
   bootstrap_mason || {
     colored_echo "${RED}Failed to bootstrap Mason. Continuing with alternative installation methods.${RESET}"
   }
-  
+
   # Install TreeSitter parsers
   install_treesitter_parsers || {
     colored_echo "${YELLOW}Failed to install TreeSitter parsers. Some syntax highlighting may not work properly.${RESET}"
   }
-  
+
   # Suppress tool messages
   suppress_brew_messages
   suppress_npm_messages
-  
+
   # Install language servers
   if [ $QUIET_MODE -eq 0 ]; then
     colored_echo "\n${BOLD}=== Installing Language Servers ===${RESET}"
@@ -858,7 +828,7 @@ main() {
   for server in "${LANGUAGE_SERVERS[@]}"; do
     install_language_server "$server"
   done
-  
+
   # Install linters
   if [ $QUIET_MODE -eq 0 ]; then
     colored_echo "\n${BOLD}=== Installing Linters ===${RESET}"
@@ -866,37 +836,37 @@ main() {
   for linter in "${LINTERS[@]}"; do
     install_linter "$linter"
   done
-  
+
   # Summary
   colored_echo "\n${BOLD}=== Installation Summary ===${RESET}"
   colored_echo "${GREEN}Successfully installed language servers (${#INSTALLED_SERVERS[@]}/${#LANGUAGE_SERVERS[@]}):${RESET}"
   for server in "${INSTALLED_SERVERS[@]}"; do
     echo "  - $server"
   done
-  
+
   if [ ${#FAILED_SERVERS[@]} -gt 0 ]; then
     colored_echo "\n${RED}Failed to install language servers (${#FAILED_SERVERS[@]}/${#LANGUAGE_SERVERS[@]}):${RESET}"
     for server in "${FAILED_SERVERS[@]}"; do
       echo "  - $server"
     done
   fi
-  
+
   colored_echo "\n${GREEN}Successfully installed linters (${#INSTALLED_LINTERS[@]}/${#LINTERS[@]}):${RESET}"
   for linter in "${INSTALLED_LINTERS[@]}"; do
     echo "  - $linter"
   done
-  
+
   if [ ${#FAILED_LINTERS[@]} -gt 0 ]; then
     colored_echo "\n${RED}Failed to install linters (${#FAILED_LINTERS[@]}/${#LINTERS[@]}):${RESET}"
     for linter in "${FAILED_LINTERS[@]}"; do
       echo "  - $linter"
     done
   fi
-  
+
   # Final note
   colored_echo "\n${BLUE}Note: Some language servers may require additional configuration.${RESET}"
   colored_echo "${BLUE}For more information, visit: https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md${RESET}"
-  
+
   # Remind about nvim Mason
   colored_echo "\n${BLUE}You can manage language servers directly in Neovim with:${RESET}"
   colored_echo "${BLUE}  :Mason${RESET}"
