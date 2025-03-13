@@ -636,7 +636,7 @@ install_treesitter_parsers() {
   # Ensure nvim-treesitter is properly installed first
   echo "Ensuring nvim-treesitter is installed..."
   nvim --headless --noplugin --clean -c "packadd nvim-treesitter" -c "qa!" > /dev/null 2>&1 || true
-  
+
   # Install each parser using nvim's command mode
   for parser in "${PARSERS[@]}"; do
     echo "Checking parser: $parser"
@@ -652,7 +652,7 @@ install_treesitter_parsers() {
     "$HOME/.local/share/nvim/site/pack/*/start/nvim-treesitter/parser"
     "$HOME/.local/share/nvim/site/pack/*/opt/nvim-treesitter/parser"
   )
-  
+
   local found=false
   for dir_pattern in "${possible_dirs[@]}"; do
     # Use globbing to expand the pattern
@@ -664,7 +664,7 @@ install_treesitter_parsers() {
       fi
     done
   done
-  
+
   if [ "$found" = true ]; then
     return 0
   else
@@ -870,6 +870,43 @@ main() {
   # Remind about nvim Mason
   colored_echo "\n${BLUE}You can manage language servers directly in Neovim with:${RESET}"
   colored_echo "${BLUE}  :Mason${RESET}"
+
+  # Configure nvim-qt on macOS to disable press-and-hold behavior
+  if [[ "$(uname)" == "Darwin" ]] && command_exists nvim-qt; then
+    colored_echo "\n${BOLD}=== Configuring nvim-qt for macOS ===${RESET}"
+
+    # Try multiple domain approaches - at least one should work
+    # Main nvim-qt domain
+    defaults write org.equalsraf.neovim ApplePressAndHoldEnabled -bool false
+
+    # Alternative bundled app domain
+    nvim_qt_path=$(which nvim-qt)
+    if [[ -L "$nvim_qt_path" ]]; then
+      # Follow symlink to actual application
+      nvim_qt_path=$(readlink "$nvim_qt_path")
+    fi
+
+    # Check if it's an app bundle
+    if [[ "$nvim_qt_path" == *.app* ]]; then
+      # Extract the bundle identifier
+      app_dir=$(dirname "$nvim_qt_path")
+      if [[ -f "$app_dir/Info.plist" ]]; then
+        bundle_id=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$app_dir/Info.plist" 2>/dev/null)
+        if [[ -n "$bundle_id" ]]; then
+          # Set for the specific bundle ID
+          defaults write "$bundle_id" ApplePressAndHoldEnabled -bool false
+        fi
+      fi
+    fi
+
+    # Global setting as a fallback
+    defaults write -g ApplePressAndHoldEnabled -bool false
+
+    colored_echo "${GREEN}Configured nvim-qt to disable press-and-hold behavior for key repeat${RESET}"
+    colored_echo "${BLUE}This allows key repeating (like holding 'j' to move down) to work properly${RESET}"
+    colored_echo "${YELLOW}Note: You may need to restart nvim-qt for changes to take effect${RESET}"
+    colored_echo "${YELLOW}If key repeat still doesn't work, you may need to restart your Mac${RESET}"
+  fi
 }
 
 # Run the main function

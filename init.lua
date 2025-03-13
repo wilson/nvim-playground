@@ -75,20 +75,36 @@ function init.setup_terminal_app_mode()
     syntax clear
     hi clear
 
-    " Set base colors with 256-color palette for startup
-    " The full colorscheme will be applied later
-    hi Normal ctermfg=252 ctermbg=233      " Light gray text on very dark gray
-    hi LineNr ctermfg=240 ctermbg=234      " Medium gray line numbers on slightly lighter bg
-    hi Comment ctermfg=245 cterm=italic    " Medium gray with italic
-    " Set initial syntax colors
-    hi Keyword    ctermfg=81  cterm=bold   " Light blue
-    hi Directory  ctermfg=75               " Bright blue
-    hi Function   ctermfg=148 cterm=bold   " Yellow-green
-    hi Statement  ctermfg=168 cterm=bold   " Light coral red
-    hi Constant   ctermfg=170 cterm=bold   " Light purple
-    hi Number     ctermfg=141              " Lighter purple
-    hi Boolean    ctermfg=176 cterm=bold   " Pinkish purple
-    hi String     ctermfg=114              " Light green
+    " Initial colors matching our final palette - more will be applied later
+    " Base UI colors - matching GUI mode with 256-color precision
+    hi Normal           ctermfg=249 ctermbg=235      " #abb2bf on #21252b
+    hi LineNr           ctermfg=8   ctermbg=236      " #737c8c - gray line numbers
+    hi SignColumn       ctermfg=249 ctermbg=236      " Match LineNr background
+    hi VertSplit        ctermfg=236 ctermbg=NONE     " #2f3542 vertical split
+    hi StatusLine       ctermfg=249 ctermbg=238      " Status line
+    hi StatusLineNC     ctermfg=8   ctermbg=236      " #737c8c - non-current status
+    hi Pmenu            ctermfg=249 ctermbg=237      " Popup menu background
+    hi PmenuSel         ctermfg=235 ctermbg=114      " Selected popup item
+
+    " Core syntax elements - selected for best readability
+    hi Comment          ctermfg=168                  " #e06c75 - rose pink
+    hi String           ctermfg=108                  " #98c379 - soft green
+    hi Character        ctermfg=139                  " #bf79c3 - same as Number
+    hi Number           ctermfg=139                  " #bf79c3 - lavender purple
+    hi Boolean          ctermfg=139                  " #bf79c3 - purple
+    hi Function         ctermfg=75                   " #61afef - soft blue
+    hi Identifier       ctermfg=252                  " Light gray, easy to read
+    hi Constant         ctermfg=139                  " Purple
+    hi Keyword          ctermfg=75                   " Blue
+    hi Type             ctermfg=108                  " Green
+    hi Statement        ctermfg=168                  " Pink/red
+    hi Special          ctermfg=8                    " #737c8c - gray for special syntax
+
+    " UI feedback elements
+    hi Search           ctermfg=235 ctermbg=173      " Dark bg with orange highlight
+    hi MatchParen       ctermfg=173 cterm=underline  " Orange underlined
+    hi Visual           ctermfg=NONE ctermbg=238     " Darker background for selections
+    hi Error            ctermfg=167 ctermbg=NONE     " #df334a - error red
 
     " Redraw to prevent flash of unstyled content
     redraw
@@ -232,7 +248,11 @@ lazy.setup({
           local args = {...}
           local msg = args[1]
           -- Allow our progress messages
-          if type(msg) == "string" and (msg:match("%%") or msg:match("⬇️") or msg:match("⌛") or msg:match("✅")) then
+          -- Check for our progress messages
+          local is_progress = type(msg) == "string" and
+                             (msg:match("%%") or msg:match("⬇️") or
+                              msg:match("⌛") or msg:match("✅"))
+          if is_progress then
             old_print(...)
             return
           end
@@ -658,32 +678,122 @@ local function force_reset_syntax()
   -- Use lw-rubber for basic color mode too (with cterm colors)
   vim.cmd("colorscheme lw-rubber")
 
-  -- Use enhanced 256-color palette for terminal mode while letting lw-rubber handle the base
+  -- Define a comprehensive 256-color palette that closely matches the GUI mode colors
+  -- These colors have been selected to exactly match the GUI equivalents
   vim.cmd([[
     " Enable syntax highlighting first to let lw-rubber define most colors
     syntax on
     syntax enable
-    " Use 256 colors for better visibility and closer GUI appearance
-    " Color codes reference: https://jonasjacek.github.io/colors/
-    " Syntax elements
-    hi Keyword    ctermfg=81  cterm=bold     " Light blue (closer to GUI blue)
-    hi Directory  ctermfg=75                 " Bright blue - visible but not harsh
-    hi Function   ctermfg=148 cterm=bold     " Yellow-green for functions
-    hi Statement  ctermfg=168 cterm=bold     " Light coral red for statements
-    hi Type       ctermfg=178 cterm=bold     " Gold/mustard for types
-    " Constants and values
-    hi Constant   ctermfg=170 cterm=bold     " Light purple for constants
-    hi Number     ctermfg=141                " Lighter purple for numbers
-    hi Boolean    ctermfg=176 cterm=bold     " Pinkish purple for booleans
-    hi Float      ctermfg=135                " Medium purple for floats
-    hi String     ctermfg=114                " Light green for strings
-    " Other common elements
-    hi Comment    ctermfg=245 cterm=italic   " Medium gray with italic
-    hi Visual     ctermbg=238                " Dark gray for selections
-    hi Search     ctermfg=232 ctermbg=214    " Black on amber for search
-    hi MatchParen ctermfg=232 ctermbg=214    " Black on amber for matching parentheses
-    hi Error      ctermfg=231 ctermbg=196    " White on red for errors
-    hi Todo       ctermfg=232 ctermbg=226    " Black on yellow for todos
+
+    " Base UI Elements - precisely matched to GUI mode
+    hi Normal           ctermfg=249 ctermbg=235      " #abb2bf on #21252b
+    hi LineNr           ctermfg=8   ctermbg=236      " #737c8c - gray line numbers
+    hi SignColumn       ctermfg=249 ctermbg=236      " Match LineNr background
+    hi VertSplit        ctermfg=236 ctermbg=NONE     " #2f3542 vertical split
+    hi StatusLine       ctermfg=249 ctermbg=238      " Status line
+    hi StatusLineNC     ctermfg=8   ctermbg=236      " Non-current status
+    hi Pmenu            ctermfg=249 ctermbg=237      " Popup menu background
+    hi PmenuSel         ctermfg=235 ctermbg=114      " Selected popup item
+    hi NonText          ctermfg=240                  " Subtle non-text chars
+    hi SpecialKey       ctermfg=240                  " Subtle special keys
+
+    " Basic Syntax Elements - core language features
+    hi Comment          ctermfg=168                  " #e06c75 - rose pink
+    hi String           ctermfg=108                  " #98c379 - soft green
+    hi Character        ctermfg=139                  " #bf79c3 - same as Number
+    hi Number           ctermfg=139                  " #bf79c3 - lavender purple
+    hi Boolean          ctermfg=139                  " Same as Number
+    hi Float            ctermfg=139                  " Same as Number
+    hi Constant         ctermfg=139                  " Purple for prominence
+    hi Function         ctermfg=75                   " #61afef - soft blue
+    hi Identifier       ctermfg=252                  " Light gray, easy to read
+    hi Statement        ctermfg=168                  " Pink/red for visibility
+    hi Special          ctermfg=8                    " #737c8c - gray for special syntax
+    hi SpecialChar      ctermfg=8                    " Same as Special
+    hi Error            ctermfg=167 ctermbg=NONE     " #df334a - error red
+
+    " Search and Selection
+    hi Search           ctermfg=235 ctermbg=173      " #21252b on #d19a66 (orange bg)
+    hi IncSearch        ctermfg=235 ctermbg=114      " Dark bg with green highlight
+    hi MatchParen       ctermfg=173 cterm=underline  " #d19a66 underlined
+    hi Visual           ctermfg=NONE ctermbg=238     " Darker background for selections
+    hi VisualNOS        ctermbg=236                  " Slightly visible visual mode
+    hi CursorLine       ctermbg=236 cterm=NONE       " Subtle cursor line highlight
+
+    " Programming Keywords and Constructs
+    hi Keyword          ctermfg=75                   " Blue for keywords
+    hi Directory        ctermfg=75                   " Same as Function for dir listings
+    hi Type             ctermfg=108                  " Green for type names
+    hi Structure        ctermfg=108                  " Same as Type for structures
+    hi StorageClass     ctermfg=108                  " Green for storage keywords
+    hi Typedef          ctermfg=108                  " Green for type definitions
+    hi PreProc          ctermfg=176                  " #c678dd - light purple for preprocessor
+    hi Include          ctermfg=176                  " Same as PreProc for includes
+    hi Define           ctermfg=176                  " Same for #define
+    hi Macro            ctermfg=176                  " Same for macros
+    hi Conditional      ctermfg=168                  " Same as Statement
+    hi Repeat           ctermfg=168                  " Same as Statement
+    hi Label            ctermfg=168                  " Same as Statement
+    hi Operator         ctermfg=249                  " Same as Normal text
+    hi Exception        ctermfg=167                  " Bright red for exceptions
+    hi Tag              ctermfg=168                  " Pink for tags
+    hi Delimiter        ctermfg=249                  " Normal color for delimiters
+    hi Todo             ctermfg=232 ctermbg=226      " Black on yellow for TODOs
+    hi SpecialComment   ctermfg=241 cterm=italic     " Distinct special comments
+
+    " Diffs - for git and other diff displays
+    hi DiffAdd          ctermfg=108 ctermbg=237      " Green text on dark bg for additions
+    hi DiffDelete       ctermfg=168 ctermbg=237      " Red text on dark bg for deletions
+    hi DiffChange       ctermfg=180 ctermbg=237      " Yellow text on dark bg for changes
+    hi DiffText         ctermfg=232 ctermbg=180      " Black on yellow for changed text
+
+    " Spelling
+    hi SpellBad         ctermfg=167 cterm=underline  " Red underline for bad spelling
+    hi SpellCap         ctermfg=75  cterm=underline  " Blue underline for cap issues
+    hi SpellRare        ctermfg=139 cterm=underline  " Purple underline for rare words
+    hi SpellLocal       ctermfg=108 cterm=underline  " Green underline for local issues
+
+    " Language-specific highlight groups
+    " Lua
+    hi luaFunction      ctermfg=75                   " Blue for function keyword
+    hi luaTable         ctermfg=249                  " Normal for tables
+    hi luaStatement     ctermfg=168                  " Pink for statements
+
+    " JavaScript
+    hi jsFunction       ctermfg=75                   " Blue for function keyword
+    hi jsGlobalObjects  ctermfg=180                  " Yellow for global objects
+    hi jsThis           ctermfg=168                  " Pink for 'this'
+    hi jsObjectKey      ctermfg=249                  " Normal for object keys
+
+    " Python
+    hi pythonFunction     ctermfg=75                 " Blue for functions
+    hi pythonBuiltin      ctermfg=180                " Yellow for builtins
+    hi pythonStatement    ctermfg=168                " Pink for statements
+    hi pythonDecorator    ctermfg=176                " Purple for decorators
+
+    " Ruby
+    hi rubyClass          ctermfg=168                " Pink for class keyword
+    hi rubyDefine         ctermfg=168                " Pink for definitions
+    hi rubySymbol         ctermfg=139                " Purple for symbols
+    hi rubyInstanceVariable ctermfg=180              " Yellow for instance vars
+
+    " Markup & Web
+    hi htmlTag            ctermfg=75                 " Blue for HTML tags
+    hi htmlEndTag         ctermfg=75                 " Blue for HTML end tags
+    hi htmlTagName        ctermfg=168                " Pink for HTML tag names
+    hi htmlArg            ctermfg=180                " Yellow for HTML attributes
+    hi markdownH1         ctermfg=168                " Pink for headers
+    hi markdownH2         ctermfg=168                " Pink for headers
+    hi markdownLink       ctermfg=75                 " Blue for links
+    hi cssClassName       ctermfg=108                " Green for CSS classes
+
+    " Unified Style - applies consistent coloring for similar construct types
+    hi Folded           ctermfg=249 ctermbg=236      " Subtle folded line color
+    hi Title            ctermfg=168 cterm=bold       " Bold pink for titles
+    hi MoreMsg          ctermfg=108                  " Green for more messages
+    hi Question         ctermfg=108                  " Green for questions
+    hi WarningMsg       ctermfg=180                  " Yellow for warnings
+    hi ErrorMsg         ctermfg=167 ctermbg=NONE     " Red for error messages
   ]])
 
   -- Let plugin-based highlighting take over
@@ -772,6 +882,7 @@ local function get_command_info()
     "  :GUIMode - Switch to GUI mode with lw-rubber and tree-sitter",
     "  :Diagnostics - Display system and terminal diagnostics with color test",
     "  :TSReinstall - Force reinstallation of TreeSitter parsers on next restart",
+    "  :ColorAnalyze - Show current color scheme highlight information",
     "  <leader>p - Open GitHub Copilot panel",
     "",
     "Color Test (shows colored blocks):",
@@ -846,6 +957,33 @@ local function add_color_test_blocks(buf)
     vim.fn.matchadd("TestBgColor" .. i, "Color " .. i .. "  $")
   end
 
+  -- Add a sample of extended 256 colors
+  vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"", "Extended color palette samples (6×6×6 cube and grayscale):"})
+
+  -- Sample of color cube (16-231)
+  local function add_color_sample(start_idx, count, label)
+    vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"  " .. label .. ":"})
+    local line = "  "
+    for i = 0, count-1 do
+      local color_idx = start_idx + i
+      line = line .. "█"
+      vim.api.nvim_set_hl(0, "ColorSample" .. color_idx, {ctermbg = color_idx, ctermfg = color_idx})
+      vim.fn.matchadd("ColorSample" .. color_idx, "█", 10, -1)
+    end
+    vim.api.nvim_buf_set_lines(buf, -1, -1, false, {line})
+  end
+
+  -- Add some representive samples from the color cube
+  add_color_sample(16, 6, "Reds (16-21)")
+  add_color_sample(34, 6, "Greens (34-39)")
+  add_color_sample(62, 6, "Blues (62-67)")
+  add_color_sample(196, 6, "Bright reds (196-201)")
+  add_color_sample(226, 6, "Yellows (226-231)")
+
+  -- Add grayscale ramp sample (232-255)
+  add_color_sample(232, 12, "Grayscale start (232-243)")
+  add_color_sample(244, 12, "Grayscale end (244-255)")
+
   -- Add text style tests
   vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"", "Text attributes:"})
 
@@ -863,6 +1001,22 @@ local function add_color_test_blocks(buf)
   vim.api.nvim_set_hl(0, "TestUnderline", {underline = true})
   vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"  Underlined text"})
   vim.fn.matchadd("TestUnderline", "Underlined text$")
+
+  -- Add ColorAnalyze info
+  vim.api.nvim_buf_set_lines(buf, -1, -1, false, {
+    "",
+    "Color Analysis Tools:",
+    "===================",
+    "",
+    "Use :ColorAnalyze to run a comprehensive analysis that:",
+    "- Compares BasicMode and GUIMode highlighting",
+    "- Identifies optimal 256-color mappings for GUI colors",
+    "- Shows differences between mode configurations",
+    "- Generates highlight commands for perfect matching",
+    "",
+    "The ColorAnalyze tool will temporarily switch between modes to compare them,",
+    "then restore your original mode when finished."
+  })
 end
 
 -- Create diagnostic function for terminal settings
@@ -927,6 +1081,30 @@ vim.api.nvim_create_user_command("TSReinstall", function()
   end
   -- Ask user to restart Neovim
   print("Please restart Neovim for changes to take effect.")
+end, {})
+
+-- Add a command to analyze color schemes
+vim.api.nvim_create_user_command("ColorAnalyze", function()
+  -- Load the color analysis module
+  local ok, color_analyze = pcall(require, "config.color_analyze")
+  if not ok then
+    vim.notify("Color analysis module not found", vim.log.levels.ERROR)
+    return
+  end
+  -- Run the analysis
+  local output = color_analyze.run_analysis()
+  -- Create buffer and display results
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, output)
+  vim.api.nvim_win_set_buf(0, buf)
+  -- Make buffer read-only and set options for better viewing
+  vim.bo[buf].modifiable = false
+  vim.bo[buf].buftype = "nofile"
+  vim.bo[buf].bufhidden = "wipe"
+  vim.bo[buf].filetype = "markdown"
+  -- Notify user about next steps
+  local msg = "Color analysis complete - try opening different filetypes to see more language highlights"
+  vim.notify(msg, vim.log.levels.INFO)
 end, {})
 
 -- TSEnableHighlight functionality is now integrated into GUIMode command
@@ -1041,3 +1219,31 @@ setup_autocmds()
 
 -- No automatic .luacheckrc creation for projects
 -- Users should create their own .luacheckrc files based on project requirements
+
+-- Fix key repeat in nvim-qt on macOS
+-- This occurs due to macOS's press-and-hold feature which nvim-qt inherits
+if vim.fn.has('gui_running') == 1 and vim.fn.has('mac') == 1 then
+  vim.api.nvim_create_autocmd("GUIEnter", {
+    callback = function()
+      -- vimscript appears to be more reliable for this specific GUI setting
+      vim.cmd([[
+        if has("gui_macvim") || exists("g:neovide") || exists("g:GuiLoaded")
+          set macligatures                  " Enable font ligatures if available
+          if exists("g:GuiLoaded")          " nvim-qt specific
+            " Disable pressing Cmd-W in GUI mode to close buffer
+            GuiMacPrefix e                  " Use "e" (Alt/Option) instead of "c" (Cmd) prefix
+            " Force key repeat to be faster for held keys
+            set ttimeoutlen=10              " Virtually eliminate delays
+            set timeoutlen=300              " Make key sequences faster
+          endif
+        endif
+      ]])
+
+      -- Try to force key repeat via options
+      vim.opt.ttimeoutlen = 10              -- Eliminate key repeat delays
+      vim.opt.timeout = true                -- Enable timeout for mappings
+      vim.opt.timeoutlen = 300              -- Set timeout length
+    end,
+    pattern = "*",
+  })
+end

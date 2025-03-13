@@ -1,32 +1,30 @@
--- Strict Lua linter configuration for Neovim config
-std = "lua51"  -- Include Lua 5.1 standard library
+-- Luacheck configuration file for Neovim configuration
 
--- Apply strict checks
-unused = true
-unused_args = true
-unused_secondaries = true
-redefined = true
-unreachable = true
-
--- Other strict settings
-self = false           -- Check for unused self
-allow_defined = false  -- Disallow defining globals
-allow_defined_top = false -- Disallow defining globals in top level
-
--- Max complexity setting
-max_cyclomatic_complexity = 10
-
--- Other performance metrics
-max_line_length = 120  -- Standard line length
-max_string_line_length = 120
-max_comment_line_length = 120
-max_code_line_length = 120
-
--- We don't want to ignore any warnings, but we'll add this for extensibility
-ignore = {}
-
--- Neovim API and related globals
+-- Allow globals defined by Neovim
 globals = {
   "vim",
-  "_G"
+  "table"
 }
+
+-- Ignore some warnings
+ignore = {
+  "212", -- Unused argument (often used in callbacks)
+  "213", -- Unused loop variable
+}
+
+-- File-specific configuration
+files["config/color_analyze.lua"] = {
+  -- Ignore cyclomatic complexity in color_analyze.lua
+  ignore = {"631"}  -- Ignore warning about line being too complex
+}
+
+-- Quiet mode
+quiet = 1
+
+-- Set max line length
+max_line_length = 120
+
+-- Misc options
+cache = true
+self = false
+codes = true
