@@ -3,6 +3,16 @@
 -- Handles initial setup of Neovim including bootstrapping lazy.nvim
 -----------------------------------------------------------
 
+-- Helper function to safely load the language configuration
+local function load_language_config()
+  local ok, config = pcall(require, "config.languages")
+  if not ok then
+    vim.notify("Failed to load language configuration: " .. (config or "unknown error"), vim.log.levels.WARN)
+    return {}
+  end
+  return config
+end
+
 -- Define init module with functions for code organization
 local init = {}
 
@@ -102,20 +112,14 @@ lazy.setup({
       vim.cmd("syntax enable")
 
       -- Configure treesitter with optimized settings
+      local lang_config = load_language_config()
       require("nvim-treesitter.configs").setup({
         auto_install = false,
         sync_install = true, -- Install parsers synchronously
-        ensure_installed = {
-          -- Programming languages
-          "lua", "rust", "python", "ruby", "javascript", "typescript", "html", "css",
-          -- Config file formats
-          "json", "toml", "yaml", "xml",
-          -- Documentation formats
-          "markdown", "markdown_inline",
-          -- Vim/Neovim specific formats
-          "vim", "vimdoc", "query",
-          -- Core languages
-          "c", "bash"
+        ensure_installed = lang_config.treesitter_parsers or {
+          -- Fallback parsers if config not available
+          "lua", "rust", "python", "javascript", "html", "css",
+          "json", "toml", "yaml", "vim", "bash"
         },
 
         highlight = {
@@ -176,12 +180,9 @@ lazy.setup({
         config = function()
           local mason_lspconfig_ok, mason_lspconfig = pcall(function() return require("mason-lspconfig") end)
           if mason_lspconfig_ok then
-            -- Load our shared language configuration
-            local lang_config_ok, lang_config = pcall(require, "config.languages")
-            local language_servers = lang_config_ok and lang_config.language_servers or {}
-
+            local lang_config = load_language_config()
             mason_lspconfig.setup({
-              ensure_installed = language_servers,
+              ensure_installed = lang_config.language_servers or {},
               automatic_installation = true,
             })
           end
@@ -193,10 +194,9 @@ lazy.setup({
         config = function()
           local lint_ok, lint = pcall(function() return require("lint") end)
           if lint_ok then
-            -- Load our shared language configuration for linters
-            local lang_config_ok, lang_config = pcall(require, "config.languages")
+            local lang_config = load_language_config()
             -- Use the linters mapping from our shared config
-            lint.linters_by_ft = lang_config_ok and lang_config.linters_by_ft or {}
+            lint.linters_by_ft = lang_config.linters_by_ft or {}
             -- Run linter on save
             vim.api.nvim_create_autocmd({ "BufWritePost" }, {
               callback = function()
@@ -347,8 +347,9 @@ function lsp.setup()
   local capabilities = cmp_nvim_lsp and cmp_nvim_lsp.default_capabilities() or {}
 
   -- Setup common LSP servers
-  local lang_config_ok, lang_config = pcall(require, "config.languages")
-  local servers = lang_config_ok and lang_config.language_servers or {}
+  local lang_config = load_language_config()
+  local servers = lang_config.language_servers or {}
+
   for _, server in pairs(servers) do
     local ok, _ = pcall(function() return require("lspconfig." .. server) end)
     if ok then

@@ -39,6 +39,20 @@ M.linters_by_ft = {
   rust = {"clippy"}
 }
 
+-- Treesitter parsers to install
+M.treesitter_parsers = {
+  -- Programming languages
+  "lua", "rust", "python", "ruby", "javascript", "typescript", "html", "css",
+  -- Config file formats
+  "json", "toml", "yaml", "xml",
+  -- Documentation formats
+  "markdown", "markdown_inline",
+  -- Vim/Neovim specific formats
+  "vim", "vimdoc", "query",
+  -- Core languages
+  "c", "bash"
+}
+
 -- Installation methods for language servers
 M.server_install_info = {
   lua_ls = {
