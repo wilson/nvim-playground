@@ -36,7 +36,7 @@ This fix injects a dynamic library into nvim-qt using DYLD_INSERT_LIBRARIES that
    ```bash
    # Function to run nvim-qt with key repeat fix and message filtering
    nvim-qt() {
-     DYLD_INSERT_LIBRARIES=/Users/wilson/Library/KeyRepeatFix/libKeyRepeatFix.dylib command nvim-qt "$@" 2> >(grep -v "IMKClient\|IMKInputSession\|IMKCFRunLoopWakeUpReliable\|Force processing repeat key" >&2)
+     DYLD_INSERT_LIBRARIES=$HOME/Library/KeyRepeatFix/libKeyRepeatFix.dylib command nvim-qt "$@" 2> >(grep -v "IMKClient\|IMKInputSession\|IMKCFRunLoopWakeUpReliable\|Force processing repeat key" >&2)
    }
    ```
 
@@ -83,7 +83,7 @@ The implemented solution:
 If key repeat still doesn't work:
 
 1. Make sure you've restarted your terminal after adding the function to `.zshrc`
-2. Verify that the path `/Users/wilson/Library/KeyRepeatFix/libKeyRepeatFix.dylib` is correct in your setup
+2. Verify that the path `$HOME/Library/KeyRepeatFix/libKeyRepeatFix.dylib` is correct in your setup
 3. Try increasing logging verbosity by removing the grep filters
 4. Check for error messages when nvim-qt is launched
 
