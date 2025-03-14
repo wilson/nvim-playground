@@ -577,7 +577,7 @@ check_prerequisites() {
   if ! command_exists npm; then
     if [[ "$OS_TYPE" == "freebsd" ]]; then
       missing+=("Node.js and npm (pkg install node npm)")
-    elif [[ "$OS_TYPE" == "macos" ]]; then 
+    elif [[ "$OS_TYPE" == "macos" ]]; then
       missing+=("Node.js and npm (brew install node)")
     else
       missing+=("Node.js and npm")
@@ -623,7 +623,6 @@ check_prerequisites() {
       echo "  - $prereq"
     done
     colored_echo "\n${YELLOW}Some language servers may not install correctly without these prerequisites.${RESET}"
-    
     if [[ "$OS_TYPE" == "freebsd" ]]; then
       colored_echo "${YELLOW}Install them with pkg first for best results.${RESET}"
     elif [[ "$OS_TYPE" == "macos" ]]; then
@@ -884,6 +883,22 @@ main() {
     for linter in "${FAILED_LINTERS[@]}"; do
       echo "  - $linter"
     done
+  fi
+
+  # Run Lazy sync to ensure all plugins are installed and up to date
+  colored_echo "\n${BOLD}=== Running Lazy Sync ===${RESET}"
+  colored_echo "${BLUE}Ensuring all plugins are installed and up to date...${RESET}"
+
+  if command_exists nvim; then
+    # Simple approach: Run a direct command to sync plugins non-interactively
+    echo "Running Lazy sync..."
+
+    # Run the sync command directly, with all output redirected to prevent hanging
+    nvim --headless -c "lua require('lazy').sync({show = false})" -c "qa!" >/dev/null 2>&1
+    # Report success
+    colored_echo "${GREEN}Lazy sync completed.${RESET}"
+  else
+    colored_echo "${RED}Neovim not found. Skipping Lazy sync.${RESET}"
   fi
 
   # Final note
