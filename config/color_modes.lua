@@ -326,6 +326,15 @@ function M.init()
   -- Create a global variable to track which mode we're in
   vim.g.basic_mode = true
 
+  -- Apply the lw-rubber colorscheme for BasicMode if available
+  local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/little-wonder")
+  if vim.fn.isdirectory(plugin_path) ~= 0 then
+    pcall(vim.cmd, "colorscheme lw-rubber")
+  end
+
+  -- Apply basic mode syntax explicitly to ensure it's active by default
+  pcall(M.force_reset_syntax)
+
   -- Setup autocmds and commands
   M.setup_autocmds()
   M.setup_commands()
