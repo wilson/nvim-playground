@@ -185,6 +185,19 @@ function M.setup_commands()
     -- Enable GUI mode with tree-sitter
     vim.g.basic_mode = false
     vim.opt.termguicolors = true
+
+    -- Set guifont if in a GUI environment
+    local utils = require("config.utils")
+    if utils.is_gui_environment() then
+      -- Pre-check SF Mono availability to avoid Qt warning
+      local fonts = require("config.fonts")
+
+      -- Suppress warning message while setting fonts
+      local old_notify = vim.notify
+      vim.notify = function() end  -- Temporarily disable notifications
+      fonts.set_best_font()
+      vim.notify = old_notify      -- Restore notifications
+    end
     -- Make sure the colorscheme is available by checking if the plugin path exists
     local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/little-wonder")
     if vim.fn.isdirectory(plugin_path) ~= 0 then
@@ -235,6 +248,38 @@ function M.setup_autocmds()
       end
     end,
     desc = "Enable GUI mode for nvim-qt"
+  })
+
+  -- Create a dedicated event handler for GUI font and appearance settings
+  vim.api.nvim_create_autocmd("User", {
+    pattern = {"GuiLoaded", "GUIEnter"},
+    callback = function()
+      -- Use dedicated font handling module for fonts
+      local fonts = require("config.fonts")
+      fonts.set_best_font()
+
+      -- Apply GUI appearance settings
+      if vim.fn.exists("*GuiLinespace") == 1 then
+        vim.cmd("GuiLinespace 1")
+      end
+
+      -- Disable GUI popup menu to use nvim's native popup
+      if vim.fn.exists("*GuiPopupmenu") == 1 then
+        vim.cmd("GuiPopupmenu 0")
+      end
+
+      -- Disable GUI tabline to use nvim's native tabline
+      if vim.fn.exists("*GuiTabline") == 1 then
+        vim.cmd("GuiTabline 0")
+      end
+
+      -- macOS specific settings
+      if vim.fn.has("macunix") == 1 and vim.fn.exists("*GuiMacPrefix") == 1 then
+        -- Use Option/Alt key as the GUI prefix (instead of Command)
+        vim.cmd("GuiMacPrefix e")
+      end
+    end,
+    desc = "Configure GUI fonts and appearance"
   })
 
   -- Standard color mode checking for other events

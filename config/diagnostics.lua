@@ -88,7 +88,8 @@ function M.get_nvim_settings()
     end)
   end
 
-  return {
+  -- Start with basic settings
+  local settings = {
     "",
     "Neovim settings:",
     "  termguicolors: " .. termguicolors,
@@ -96,6 +97,178 @@ function M.get_nvim_settings()
     "  Basic mode: " .. tostring(vim.g.basic_mode or "Not set"),
     "  Vim version: " .. version,
   }
+
+  -- Add GUI-specific information when in a GUI environment
+  if gui_status == "Yes" then
+    -- Create a section for GUI-specific info
+    table.insert(settings, "")
+    table.insert(settings, "GUI information:")
+
+    -- Simple and reliable nvim-qt detection
+    local gui_client = "Unknown"
+
+    -- Based on our diagnostics, nvim-qt detection seems to work well
+    if vim.g.nvim_qt_detected or vim.g.GuiLoaded then
+      gui_client = "nvim-qt"
+    elseif vim.fn.has('gui_running') == 1 then
+      -- Check if nvim-qt is in the parent process path
+      local is_nvim_qt = false
+      pcall(function()
+        if vim.fn.has('unix') == 1 then
+          local ppid_cmd = vim.fn.system("ps -o ppid= -p " .. vim.fn.getpid() .. " | tr -d ' \n'")
+          if ppid_cmd and #ppid_cmd > 0 then
+            local parent_cmd = vim.fn.system("ps -o command= -p " .. ppid_cmd .. " | tr -d '\n'")
+            if parent_cmd and parent_cmd:match("nvim%-qt") then
+              is_nvim_qt = true
+            end
+          end
+        end
+      end)
+
+      -- Set client based on detection
+      if is_nvim_qt then
+        gui_client = "nvim-qt"
+      else
+        gui_client = "GUI environment"
+      end
+    end
+
+    -- Get nvim-qt process info and version if possible
+    local gui_app_name = ""
+    pcall(function()
+      if vim.fn.has('unix') == 1 then
+        -- Get nvim info
+        local nvim_version = vim.version()
+        local nvim_version_str = nvim_version and string.format("%d.%d.%d",
+          nvim_version.major, nvim_version.minor, nvim_version.patch) or ""
+
+        -- Start with basic info
+        gui_app_name = " (neovim " .. nvim_version_str
+
+        -- Get parent process for nvim-qt
+        local ppid_cmd = vim.fn.system("ps -o ppid= -p " .. vim.fn.getpid() .. " | tr -d ' \n'")
+        if ppid_cmd and #ppid_cmd > 0 then
+          local parent_path = vim.fn.system("ps -o command= -p " .. ppid_cmd .. " | head -c 60")
+
+          -- Extract nvim-qt version from path if possible
+          local nvim_qt_version = parent_path:match("neovim%-qt/([%d%.]+)/") or ""
+          if nvim_qt_version ~= "" then
+            gui_app_name = gui_app_name .. " + nvim-qt " .. nvim_qt_version
+          end
+        end
+
+        gui_app_name = gui_app_name .. ")"
+      end
+    end)
+
+    table.insert(settings, "  GUI client: " .. gui_client .. gui_app_name)
+
+    -- Get font information with improved detection
+    pcall(function()
+      local font = "Unknown"
+      local font_source = ""
+
+      -- Check various font sources in order of preference
+      if vim.o.guifont and vim.o.guifont ~= "" then
+        font = vim.o.guifont
+        font_source = "guifont"
+      elseif vim.g.GuiFont and vim.g.GuiFont ~= "" then
+        font = vim.g.GuiFont
+        font_source = "GuiFont"
+      elseif vim.fn.exists("+guifont") == 1 then
+        -- Try getting via direct command
+        local ok, cmd_font = pcall(vim.api.nvim_exec2, "set guifont?", {output = true})
+        if ok and cmd_font and cmd_font.output then
+          local stripped = cmd_font.output:gsub("guifont=", ""):gsub("^%s*(.-)%s*$", "%1")
+          if stripped ~= "" then
+            font = stripped
+            font_source = "set guifont?"
+          end
+        end
+      end
+
+      -- Check if we're using default Courier New (likely not deliberately set)
+      local is_default = font:match("^Courier") ~= nil
+
+      -- Add font info
+      table.insert(settings, "  Font: " .. font ..
+                          (font_source ~= "" and " (from " .. font_source .. ")" or ""))
+
+      -- Add a helpful note if using default font
+      if is_default then
+        table.insert(settings, "  Font tip: Set custom font with: vim.o.guifont = 'SF Mono:h13'")
+      end
+
+      -- Add SF Mono installation instructions if on macOS
+      if vim.fn.has("macunix") == 1 and (font:match("SF Mono") or is_default) then
+        table.insert(settings, "")
+        table.insert(settings, "  SF Mono installation:")
+        table.insert(settings, "    If 'Unknown font' errors occur, install SF Mono by running:")
+        table.insert(settings, "    mkdir -p ~/Library/Fonts")
+        table.insert(settings, "    cp /System/Applications/Utilities/Terminal.app/Contents/Resources/Fonts/SF-*.otf ~/Library/Fonts/")
+        table.insert(settings, "    The install_dev_tools.sh script will attempt to install these fonts automatically")
+      end
+    end)
+
+    -- Try to get window dimensions
+    pcall(function()
+      local width = vim.api.nvim_win_get_width(0)
+      local height = vim.api.nvim_win_get_height(0)
+      if width > 0 and height > 0 then
+        table.insert(settings, "  Window size: " .. width .. "×" .. height)
+      end
+    end)
+
+    -- Check for macOS key repeat fix
+    pcall(function()
+      if vim.fn.has('mac') == 1 and vim.g.GuiLoaded then
+        local env_var = os.getenv("DYLD_INSERT_LIBRARIES")
+        local has_fix = env_var and env_var:match("KeyRepeatFix") ~= nil
+        table.insert(settings, "  Key repeat fix: " .. (has_fix and "Active" or "Not active"))
+      end
+    end)
+
+    -- Check for full GUI features
+    pcall(function()
+      local features = {}
+      -- nvim-qt specific features
+      if vim.g.GuiLoaded then
+        if vim.fn.exists('*GuiClipboard') == 1 then table.insert(features, "clipboard") end
+        if vim.fn.exists('*GuiScrollBar') == 1 then table.insert(features, "scrollbar") end
+        if vim.fn.exists('*GuiTabline') == 1 then table.insert(features, "tabline") end
+        if vim.fn.exists('*GuiPopupmenu') == 1 then table.insert(features, "popupmenu") end
+        if vim.fn.exists('*GuiWindowOpacity') == 1 then table.insert(features, "opacity") end
+      end
+
+      -- Check for general GUI capabilities
+      if vim.fn.has('clipboard') == 1 then table.insert(features, "system-clipboard") end
+      if vim.fn.has('mouse') == 1 then table.insert(features, "mouse") end
+      if vim.opt.termguicolors:get() then table.insert(features, "true-color") end
+
+      if #features > 0 then
+        table.insert(settings, "  GUI features: " .. table.concat(features, ", "))
+      end
+    end)
+
+    -- Add GUI environment variables if any are present
+    pcall(function()
+      local gui_env_vars = {}
+      local env_var_names = {"QT_QPA_PLATFORM", "WAYLAND_DISPLAY", "DISPLAY", "NVIM_QT_PATH"}
+
+      for _, var_name in ipairs(env_var_names) do
+        local value = os.getenv(var_name)
+        if value and value ~= "" then
+          table.insert(gui_env_vars, var_name .. "=" .. value)
+        end
+      end
+
+      if #gui_env_vars > 0 then
+        table.insert(settings, "  GUI environment vars: " .. table.concat(gui_env_vars, ", "))
+      end
+    end)
+  end
+
+  return settings
 end
 
 -- Helper function to get TreeSitter information for diagnostics

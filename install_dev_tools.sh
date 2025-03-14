@@ -123,12 +123,25 @@ extract_lua_array() {
   temp_file=$(mktemp)
 
   # Create a small Lua script to print the array contents
-  cat > "$temp_file" << EOF
-local config = dofile('$CONFIG_FILE')
-for _, item in ipairs(config.$array_name) do
+  # We also define a mock vim object to avoid errors in the languages.lua file
+  cat > "$temp_file" << 'EOF'
+-- Mock vim object to avoid errors in language config
+vim = {
+  api = {
+    nvim_get_runtime_file = function() return {} end
+  }
+}
+
+-- Now load the config and extract the requested array
+local config = dofile('CONFIG_FILE_PLACEHOLDER')
+for _, item in ipairs(config.ARRAY_NAME_PLACEHOLDER) do
   print(item)
 end
 EOF
+
+  # Replace placeholders with actual values
+  sed -i '' "s|CONFIG_FILE_PLACEHOLDER|$CONFIG_FILE|g" "$temp_file"
+  sed -i '' "s|ARRAY_NAME_PLACEHOLDER|$array_name|g" "$temp_file"
 
   # Run the script with Lua and capture output
   if command_exists lua; then
@@ -158,13 +171,28 @@ get_install_method() {
   temp_file=$(mktemp)
 
   # Create a small Lua script to get the installation method
-  cat > "$temp_file" << EOF
-local config = dofile('$CONFIG_FILE')
-local item_info = config.${table_name}['$item_name']
-if item_info and item_info['$method'] then
-  print(item_info['$method'])
+  # Include the same mock vim object for consistency
+  cat > "$temp_file" << 'EOF'
+-- Mock vim object to avoid errors in language config
+vim = {
+  api = {
+    nvim_get_runtime_file = function() return {} end
+  }
+}
+
+-- Get the installation method
+local config = dofile('CONFIG_FILE_PLACEHOLDER')
+local item_info = config.TABLE_NAME_PLACEHOLDER['ITEM_NAME_PLACEHOLDER']
+if item_info and item_info['METHOD_PLACEHOLDER'] then
+  print(item_info['METHOD_PLACEHOLDER'])
 end
 EOF
+
+  # Replace placeholders with actual values
+  sed -i '' "s|CONFIG_FILE_PLACEHOLDER|$CONFIG_FILE|g" "$temp_file"
+  sed -i '' "s|TABLE_NAME_PLACEHOLDER|${table_name}|g" "$temp_file"
+  sed -i '' "s|ITEM_NAME_PLACEHOLDER|$item_name|g" "$temp_file"
+  sed -i '' "s|METHOD_PLACEHOLDER|$method|g" "$temp_file"
 
   # Run the script with Lua and capture output
   local result=""
@@ -180,15 +208,32 @@ EOF
 }
 
 # Extract language servers and linters
+# Define default language servers in case we can't read from config
+DEFAULT_LANGUAGE_SERVERS=("lua_ls" "pyright" "bashls" "tsserver" "jsonls" "yamlls")
+DEFAULT_LINTERS=("luacheck" "shellcheck" "eslint_d")
+
+# Try to extract from config first
 LANGUAGE_SERVERS=()
 while read -r server; do
   LANGUAGE_SERVERS+=("$server")
-done < <(extract_lua_array "language_servers")
+done < <(extract_lua_array "language_servers" 2>/dev/null)
+
+# If no servers found or error occurred, use defaults
+if [ ${#LANGUAGE_SERVERS[@]} -eq 0 ]; then
+  colored_echo "${YELLOW}Could not read language servers from config. Using defaults.${RESET}"
+  LANGUAGE_SERVERS=("${DEFAULT_LANGUAGE_SERVERS[@]}")
+fi
 
 LINTERS=()
 while read -r linter; do
   LINTERS+=("$linter")
-done < <(extract_lua_array "linters")
+done < <(extract_lua_array "linters" 2>/dev/null)
+
+# If no linters found or error occurred, use defaults
+if [ ${#LINTERS[@]} -eq 0 ]; then
+  colored_echo "${YELLOW}Could not read linters from config. Using defaults.${RESET}"
+  LINTERS=("${DEFAULT_LINTERS[@]}")
+fi
 
 # Track installed and failed items
 INSTALLED_SERVERS=()
@@ -669,10 +714,20 @@ install_treesitter_parsers() {
   echo "Installing TreeSitter parsers..."
 
   # Extract treesitter parsers from config
+  # Define a list of common parsers in case we can't read from config
+  DEFAULT_PARSERS=("lua" "vim" "vimdoc" "query" "python" "bash" "c" "cpp" "javascript" "typescript")
+  
+  # Try to extract from config first
   PARSERS=()
   while read -r parser; do
     PARSERS+=("$parser")
-  done < <(extract_lua_array "treesitter_parsers")
+  done < <(extract_lua_array "treesitter_parsers" 2>/dev/null)
+  
+  # If no parsers found or error occurred, use defaults
+  if [ ${#PARSERS[@]} -eq 0 ]; then
+    colored_echo "${YELLOW}Could not read TreeSitter parsers from config. Using defaults.${RESET}"
+    PARSERS=("${DEFAULT_PARSERS[@]}")
+  fi
 
   # Ensure nvim-treesitter is properly installed first
   echo "Ensuring nvim-treesitter is installed..."
@@ -908,6 +963,37 @@ main() {
   # Remind about nvim Mason
   colored_echo "\n${BLUE}You can manage language servers directly in Neovim with:${RESET}"
   colored_echo "${BLUE}  :Mason${RESET}"
+  
+  # On macOS, install SF Mono fonts if they're not already in the user's Fonts directory
+  if [[ "$OS_TYPE" == "macos" ]]; then
+    # Check if fonts are already installed - use safer glob check
+    if ! test -n "$(find ~/Library/Fonts -name "SF-*.otf" 2>/dev/null)"; then
+      colored_echo "\n${BOLD}=== Installing SF Mono Fonts ===${RESET}"
+      colored_echo "${BLUE}SF Mono fonts not found in user font directory.${RESET}"
+      
+      # Check if source fonts exist - use safer glob check
+      if test -n "$(find /System/Applications/Utilities/Terminal.app/Contents/Resources/Fonts -name "SF-*.otf" 2>/dev/null)"; then
+        # Create font directory if it doesn't exist
+        mkdir -p ~/Library/Fonts
+        
+        # Copy fonts
+        colored_echo "${BLUE}Copying SF Mono fonts from Terminal.app to ~/Library/Fonts/${RESET}"
+        cp /System/Applications/Utilities/Terminal.app/Contents/Resources/Fonts/SF-*.otf ~/Library/Fonts/
+        
+        if [ $? -eq 0 ]; then
+          colored_echo "${GREEN}SF Mono fonts installed successfully.${RESET}"
+        else
+          colored_echo "${RED}Failed to copy SF Mono fonts.${RESET}"
+        fi
+      else
+        colored_echo "${YELLOW}SF Mono fonts not found in Terminal.app. Skipping font installation.${RESET}"
+      fi
+    else
+      if [ $QUIET_MODE -eq 0 ]; then
+        colored_echo "\n${GREEN}SF Mono fonts are already installed in ~/Library/Fonts/${RESET}"
+      fi
+    fi
+  fi
 
   # OS-specific notes
   if [[ "$OS_TYPE" == "macos" ]] && command_exists nvim-qt; then

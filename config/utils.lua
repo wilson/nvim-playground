@@ -7,15 +7,16 @@ local M = {}
 
 -- Function to check if running in a GUI environment
 function M.is_gui_environment()
-  -- Simple and reliable GUI detection that works with nvim-qt
+  -- Focused primarily on nvim-qt detection based on diagnostics results
 
-  -- Check for nvim-qt's GuiLoaded global
-  if vim.g.GuiLoaded then
+  -- Check for nvim-qt's nvim_qt_detected marker (set in our autocmds)
+  -- This appears to be the most reliable indicator
+  if vim.g.nvim_qt_detected then
     return true
   end
 
-  -- Check for nvim-qt's nvim_qt_detected marker (set in our autocmds)
-  if vim.g.nvim_qt_detected then
+  -- Check for nvim-qt's GuiLoaded global
+  if vim.g.GuiLoaded then
     return true
   end
 
@@ -24,13 +25,8 @@ function M.is_gui_environment()
     return true
   end
 
-  -- Check for Neovide
-  if vim.g.neovide then
-    return true
-  end
-
-  -- Check common GUI environment variables
-  if vim.env.NVIM_GUI or vim.env.TERM_PROGRAM == "neovide" then
+  -- Simple fallback for other GUI environments
+  if vim.g.neovide or vim.env.NVIM_GUI then
     return true
   end
 
