@@ -73,10 +73,7 @@ M.server_settings = {
         workspace = {
           -- Make server aware of Neovim runtime files
           -- Use empty table when running outside of Neovim
-          library = function()
-            -- This function only gets called by Neovim, not by the install script
-            return vim.api.nvim_get_runtime_file("", true)
-          end,
+          library = vim.api.nvim_get_runtime_file("", true),
           checkThirdParty = false,
         },
         telemetry = {

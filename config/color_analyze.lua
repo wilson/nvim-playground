@@ -31,31 +31,57 @@ M.highlight_groups = {
   "markdownH1", "markdownLink", "htmlTag", "cssClassName"
 }
 
+-- Extract highlight attributes from highlight command output
+local function extract_hl_attributes(hl_str)
+  local ctermfg = hl_str:match("ctermfg=(%S+)")
+  local ctermbg = hl_str:match("ctermbg=(%S+)")
+  local cterm = hl_str:match("cterm=(%S+)")
+  local gui = hl_str:match("gui=(%S+)")
+  return ctermfg, ctermbg, cterm, gui
+end
+
+-- Format colors to hex format
+local function format_colors(hl)
+  local fg = "none"
+  local bg = "none"
+
+  if hl.fg and type(hl.fg) == "number" then
+    fg = string.format("#%06x", hl.fg)
+  end
+
+  if hl.bg and type(hl.bg) == "number" then
+    bg = string.format("#%06x", hl.bg)
+  end
+  return fg, bg
+end
+
 -- Get highlight information with format
 function M.get_hl_format(group_name)
-  local hl, ctermfg, ctermbg, cterm, gui
+  local ctermfg, ctermbg, cterm, gui
 
-  -- Get highlight attributes (using new API)
-  hl = vim.api.nvim_get_hl(0, {name = group_name})
+  -- Safely get highlight attributes
+  local ok, hl = pcall(vim.api.nvim_get_hl, 0, {name = group_name})
+  if not ok or not hl then
+    hl = {}
+  end
 
-  -- Try to get terminal color codes
-  local hl_str = vim.api.nvim_exec2("highlight " .. group_name, {output = true}).output
-  ctermfg = hl_str:match("ctermfg=(%S+)")
-  ctermbg = hl_str:match("ctermbg=(%S+)")
-  cterm = hl_str:match("cterm=(%S+)")
-  gui = hl_str:match("gui=(%S+)")
+  -- Safely get terminal color codes
+  local cmd_ok, result = pcall(vim.api.nvim_exec2, "highlight " .. group_name, {output = true})
+  if cmd_ok and result and result.output then
+    ctermfg, ctermbg, cterm, gui = extract_hl_attributes(result.output)
+  end
 
   -- Format colors as hex
-  local fg = hl.fg and string.format("#%06x", hl.fg) or "none"
-  local bg = hl.bg and string.format("#%06x", hl.bg) or "none"
+  local fg, bg = format_colors(hl)
 
-  -- Build attribute list
+  -- Build attribute list safely
   local attrs = {}
-  if hl.bold then table.insert(attrs, "bold") end
-  if hl.italic then table.insert(attrs, "italic") end
-  if hl.underline then table.insert(attrs, "underline") end
+  if hl.bold == true then table.insert(attrs, "bold") end
+  if hl.italic == true then table.insert(attrs, "italic") end
+  if hl.underline == true then table.insert(attrs, "underline") end
   local attr_str = #attrs > 0 and table.concat(attrs, ",") or gui or cterm or "none"
 
+  -- Return a safe result with no functions or complex objects
   return {
     name = group_name,
     fg = fg,
@@ -76,46 +102,47 @@ function M.hex_to_256(hex)
   local r, g, b = hex:match("#(%x%x)(%x%x)(%x%x)")
   if not r then return "none" end
 
-  r, g, b = tonumber(r, 16), tonumber(g, 16), tonumber(b, 16)
+  -- Convert hex to decimal
+  local r_dec = tonumber(r, 16) or 0
+  local g_dec = tonumber(g, 16) or 0
+  local b_dec = tonumber(b, 16) or 0
 
-  -- Standard 6x6x6 color cube starts at index 16
-  -- Each component has 6 possible values: 0, 95, 135, 175, 215, 255
-  local function get_cube_index(comp)
-    local values = {0, 95, 135, 175, 215, 255}
-    local closest_val = values[1]
-    local min_diff = math.abs(comp - closest_val)
+  -- Define the cube values statically to avoid creating functions during LSP operations
+  local values = {0, 95, 135, 175, 215, 255}
 
+  -- Find closest cube value without using a nested function
+  local function find_closest_value(comp)
+    -- Initialize with first value
+    local min_diff = math.abs(comp - values[1])
+    local closest_idx = 0
+
+    -- Check remaining values
     for i = 2, 6 do
       local diff = math.abs(comp - values[i])
       if diff < min_diff then
         min_diff = diff
-        closest_val = values[i]
+        closest_idx = i - 1
       end
     end
 
-    -- Find index (0-5)
-    for i = 1, 6 do
-      if values[i] == closest_val then
-        return i - 1
-      end
-    end
-    return 0
+    return closest_idx
   end
+  -- Get indices
+  local r_idx = find_closest_value(r_dec)
+  local g_idx = find_closest_value(g_dec)
+  local b_idx = find_closest_value(b_dec)
 
   -- Calculate color cube index (16-231)
-  local r_idx = get_cube_index(r)
-  local g_idx = get_cube_index(g)
-  local b_idx = get_cube_index(b)
   local cube_idx = 16 + (36 * r_idx) + (6 * g_idx) + b_idx
 
-  -- Check grayscale ramp (232-255)
-  -- Grayscale ranges from 8 to 238 in 24 steps
-  local gray = (r + g + b) / 3
+  -- Calculate grayscale
+  local gray = (r_dec + g_dec + b_dec) / 3
   local gray_idx = math.floor((gray - 8) / 10) + 232
   gray_idx = math.max(232, math.min(255, gray_idx))
 
-  -- Choose between color cube and grayscale based on colorfulness
-  local std_dev = math.sqrt(((r - gray)^2 + (g - gray)^2 + (b - gray)^2) / 3)
+  -- Choose between color cube and grayscale based on standard deviation
+  local std_dev = math.sqrt(((r_dec - gray)^2 + (g_dec - gray)^2 + (b_dec - gray)^2) / 3)
+
   if std_dev < 20 then  -- If color is close to grayscale
     return tostring(gray_idx)
   else
@@ -166,9 +193,12 @@ end
 function M.capture_current_highlights()
   local results = {}
   for _, group in ipairs(M.highlight_groups) do
-    local ok, info = pcall(M.get_hl_format, group)
-    if ok and pcall(vim.fn.hlID, group) and vim.fn.hlID(group) > 0 then
-      table.insert(results, info)
+    -- Check if the highlight group exists first
+    if vim.fn.hlID(group) > 0 then
+      local ok, info = pcall(M.get_hl_format, group)
+      if ok then
+        table.insert(results, info)
+      end
     end
   end
   return results
@@ -377,28 +407,40 @@ function M.run_analysis()
   -- First, capture current state
   local current_results = M.capture_current_highlights()
 
-  -- Then switch modes to capture the other state
-  if vim.g.basic_mode then
-    -- Currently in BasicMode, switch to GUIMode
-    vim.cmd("GUIMode")
-  else
-    -- Currently in GUIMode, switch to BasicMode
-    vim.cmd("BasicMode")
-  end
+  -- Create placeholder for other mode results
+  local other_mode = starting_mode and "GUIMode" or "BasicMode"
+  local other_results = {}
 
-  -- Wait for highlighting to apply and get the other mode's results
-  vim.cmd("redraw!")
-  vim.cmd("sleep 200m") -- Ensure highlighting is fully applied
-  local other_mode = vim.g.basic_mode and "BasicMode" or "GUIMode"
-  local other_results = M.capture_current_highlights()
+  -- Safely try to switch modes and capture other state
+  local switch_ok, _ = pcall(function()
+    -- Switch modes
+    if vim.g.basic_mode then
+      -- Currently in BasicMode, switch to GUIMode
+      vim.cmd("GUIMode")
+    else
+      -- Currently in GUIMode, switch to BasicMode
+      vim.cmd("BasicMode")
+    end
 
-  -- Restore original mode
-  if starting_mode then
-    vim.cmd("BasicMode")
-  else
-    vim.cmd("GUIMode")
+    -- Wait for highlighting to apply
+    vim.cmd("redraw!")
+    vim.cmd("sleep 200m") -- Ensure highlighting is fully applied
+
+    -- Capture the other mode's results
+    other_results = M.capture_current_highlights()
+
+    -- Restore original mode
+    if starting_mode then
+      vim.cmd("BasicMode")
+    else
+      vim.cmd("GUIMode")
+    end
+    vim.cmd("redraw!")
+  end)
+
+  if not switch_ok then
+    vim.notify("Error switching color modes. Analysis will be limited.", vim.log.levels.WARN)
   end
-  vim.cmd("redraw!")
 
   -- Combine results
   local combined_results = M.combine_mode_results(
