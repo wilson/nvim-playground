@@ -228,10 +228,9 @@ function M.setup_autocmds()
         return
       end
 
-      -- Reuse the is_gui_environment function from init.lua
-      local in_gui = vim.fn.has('gui_running') == 1 or
-                    (vim.env.NVIM_GUI or vim.env.TERM_PROGRAM == "neovide") or
-                    vim.g.neovide or vim.g.GuiLoaded
+      -- Use the is_gui_environment function from utils
+      local utils = require("config.utils")
+      local in_gui = utils.is_gui_environment()
 
       -- Auto-switch to GUI mode when in GUI environment
       if in_gui and not vim.g._init_colors_done and not vim.g.force_terminal_mode then
