@@ -8,8 +8,8 @@ local M = {}
 -- Function to set up the basic terminal mode colors and settings
 function M.force_reset_syntax()
   -- Skip in headless mode
-  local is_headless = #vim.api.nvim_list_uis() == 0
-  if is_headless then
+  local utils = require("config.utils")
+  if utils.is_headless() then
     return
   end
 

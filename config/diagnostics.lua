@@ -18,26 +18,18 @@ function M.get_env_info()
     "Environment variables:",
   }
 
-  -- Safely get environment variables with error checking
-  local function safe_get_env(var_name)
-    local value = "not set"
-    pcall(function()
-      if vim.env and vim.env[var_name] then
-        value = vim.env[var_name]
-      end
-    end)
-    return value
-  end
+  -- Use utils.safe_get_env for environment variables
+  local utils = require("config.utils")
 
   -- Add critical environment variables
-  table.insert(env_info, "  TERM: " .. safe_get_env("TERM"))
-  table.insert(env_info, "  COLORTERM: " .. safe_get_env("COLORTERM"))
-  table.insert(env_info, "  TERM_PROGRAM: " .. safe_get_env("TERM_PROGRAM"))
+  table.insert(env_info, "  TERM: " .. utils.safe_get_env("TERM"))
+  table.insert(env_info, "  COLORTERM: " .. utils.safe_get_env("COLORTERM"))
+  table.insert(env_info, "  TERM_PROGRAM: " .. utils.safe_get_env("TERM_PROGRAM"))
 
   -- Add additional useful environment variables if they exist
   local optional_vars = {"TMUX", "SSH_CLIENT", "DISPLAY", "XDG_SESSION_TYPE"}
   for _, var in ipairs(optional_vars) do
-    local value = safe_get_env(var)
+    local value = utils.safe_get_env(var)
     if value ~= "not set" then
       table.insert(env_info, "  " .. var .. ": " .. value)
     end
