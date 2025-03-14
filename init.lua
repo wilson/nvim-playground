@@ -22,7 +22,6 @@ local function load_language_config()
   return result
 end
 
--- Removed unused load_plugin function
 
 -- Module initialization
 local init = {}
@@ -61,11 +60,7 @@ function init.setup_basic_mode()
   if ok then
     color_modes.init()
   else
-    -- Fallback to basic settings if module fails to load
-    vim.notify("Failed to load color_modes module. Using fallback settings.", vim.log.levels.WARN)
-    vim.opt.termguicolors = false
-    vim.opt.background = "dark"
-    vim.g.basic_mode = true
+    vim.notify("Failed to load color_modes module.", vim.log.levels.ERROR)
   end
 end
 
@@ -140,10 +135,6 @@ function init.setup()
     -- LSP Configuration
     {
       "neovim/nvim-lspconfig",
-      dependencies = {
-        -- Optional LSP progress UI
-        -- { "j-hui/fidget.nvim", tag = "legacy" },
-      },
       config = function()
         -- Set up LSP keymaps and configurations
         local lspconfig = require("lspconfig")
@@ -164,15 +155,7 @@ function init.setup()
         local servers = languages_config.lsp_servers or {}
         for _, lsp in ipairs(servers) do
           lspconfig[lsp].setup({
-            on_attach = function(client, bufnr)
-              -- Enable formatting capability for each server
-              -- if client.server_capabilities.documentFormattingProvider then
-              --   vim.api.nvim_buf_set_option(bufnr, "formatexpr", "v:lua.vim.lsp.formatexpr()")
-              --   -- Optional: Format on save
-              --   -- local format_cmd = function() vim.lsp.buf.format() end
-              --   -- vim.api.nvim_create_autocmd("BufWritePre", { buffer = bufnr, callback = format_cmd })
-              -- end
-            end,
+            on_attach = function(client, bufnr) end,
             capabilities = require("cmp_nvim_lsp").default_capabilities(),
           })
         end
@@ -342,6 +325,13 @@ function init.setup()
     print("Please restart Neovim for changes to take effect.")
   end, {})
 
+  -- Check if we're in a GUI environment (moved to a reusable function)
+  local function is_gui_environment()
+    return vim.fn.has('gui_running') == 1 or
+           (vim.env.NVIM_GUI or vim.env.TERM_PROGRAM == "neovide") or
+           vim.g.neovide or vim.g.GuiLoaded
+  end
+
   -- Helper function to get environment information for diagnostics
   local function get_env_info()
     return {
@@ -357,12 +347,7 @@ function init.setup()
 
   -- Helper function to get Neovim settings for diagnostics
   local function get_nvim_settings()
-    -- Determine if we're in a GUI environment
-    local in_gui = vim.fn.has('gui_running') == 1 or
-                  (vim.env.NVIM_GUI or vim.env.TERM_PROGRAM == "neovide") or
-                  vim.g.neovide or vim.g.GuiLoaded
-
-    local gui_status = in_gui and "Yes" or "No"
+    local gui_status = is_gui_environment() and "Yes" or "No"
 
     return {
       "",
@@ -522,11 +507,7 @@ function init.setup()
     add_color_test_blocks(buf)
 
     -- Add GUI-specific recommendations
-    local in_gui = vim.fn.has('gui_running') == 1 or
-                  (vim.env.NVIM_GUI or vim.env.TERM_PROGRAM == "neovide") or
-                  vim.g.neovide or vim.g.GuiLoaded
-
-    if in_gui then
+    if is_gui_environment() then
       vim.api.nvim_buf_set_lines(buf, -1, -1, false, {
         "",
         "GUI Environment Detected:",

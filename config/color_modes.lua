@@ -178,8 +178,6 @@ function M.setup_commands()
     vim.g.explicit_mode_change = nil
   end, {})
 
-  -- TerminalMode command removed (use BasicMode instead)
-
   -- GUI mode with true colors and TreeSitter
   vim.api.nvim_create_user_command("GUIMode", function()
     -- Mark that we're explicitly running the command
@@ -230,7 +228,7 @@ function M.setup_autocmds()
         return
       end
 
-      -- Special handling for GUI environments
+      -- Reuse the is_gui_environment function from init.lua
       local in_gui = vim.fn.has('gui_running') == 1 or
                     (vim.env.NVIM_GUI or vim.env.TERM_PROGRAM == "neovide") or
                     vim.g.neovide or vim.g.GuiLoaded
@@ -243,17 +241,8 @@ function M.setup_autocmds()
           local old_notify = vim.notify
           vim.notify = function() end
 
-          -- Apply GUI mode
-          vim.g.basic_mode = false
-          vim.opt.termguicolors = true
-          -- Make sure the colorscheme is available by checking if the plugin path exists
-          local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/little-wonder")
-          if vim.fn.isdirectory(plugin_path) == 1 then
-            pcall(vim.cmd, "colorscheme lw-rubber")
-          else
-            vim.notify("little-wonder plugin not found. Colorscheme not applied.", vim.log.levels.WARN)
-          end
-          vim.api.nvim_exec_autocmds("User", { pattern = "GUIModeApplied" })
+          -- Apply GUI mode using the existing command
+          vim.cmd("GUIMode")
           -- Restore notify
           vim.notify = old_notify
           -- Set flag

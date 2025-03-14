@@ -31,31 +31,19 @@ M.highlight_groups = {
   "markdownH1", "markdownLink", "htmlTag", "cssClassName"
 }
 
--- Get highlight information with format for Neovim version
+-- Get highlight information with format
 function M.get_hl_format(group_name)
   local hl, ctermfg, ctermbg, cterm, gui
 
-  -- Get highlight attributes based on Neovim version (API changed in 0.9)
-  if vim.fn.has('nvim-0.9') == 1 then
-    -- For Neovim 0.9+
-    hl = vim.api.nvim_get_hl(0, {name = group_name})
+  -- Get highlight attributes (using new API)
+  hl = vim.api.nvim_get_hl(0, {name = group_name})
 
-    -- Try to get terminal color codes
-    local hl_str = vim.api.nvim_exec2("highlight " .. group_name, {output = true}).output
-    ctermfg = hl_str:match("ctermfg=(%S+)")
-    ctermbg = hl_str:match("ctermbg=(%S+)")
-    cterm = hl_str:match("cterm=(%S+)")
-    gui = hl_str:match("gui=(%S+)")
-  else
-    -- For older Neovim versions
-    hl = vim.api.nvim_get_hl_by_name(group_name, true)
-    -- Use vim.cmd to get ANSI codes
-    local hl_str = vim.fn.execute("highlight " .. group_name)
-    ctermfg = hl_str:match("ctermfg=(%S+)")
-    ctermbg = hl_str:match("ctermbg=(%S+)")
-    cterm = hl_str:match("cterm=(%S+)")
-    gui = hl_str:match("gui=(%S+)")
-  end
+  -- Try to get terminal color codes
+  local hl_str = vim.api.nvim_exec2("highlight " .. group_name, {output = true}).output
+  ctermfg = hl_str:match("ctermfg=(%S+)")
+  ctermbg = hl_str:match("ctermbg=(%S+)")
+  cterm = hl_str:match("cterm=(%S+)")
+  gui = hl_str:match("gui=(%S+)")
 
   -- Format colors as hex
   local fg = hl.fg and string.format("#%06x", hl.fg) or "none"
@@ -139,37 +127,36 @@ end
 function M.get_known_mappings()
   -- Extract color definitions from the code
   local known_mappings = {
-    -- Base colors from the configuration (from our code analysis)
+    -- Base colors from the configuration
     ["#abb2bf"] = "249", -- Normal fg
     ["#21252b"] = "235", -- Normal bg
-    ["#e06c75"] = "168", -- Comment, Statement (pink/red)
-    ["#98c379"] = "108", -- String, Type (green)
-    ["#bf79c3"] = "139", -- Number, Boolean, Constant (purple)
-    ["#61afef"] = "75", -- Function, Keyword (blue)
-    ["#d19a66"] = "173", -- Search, MatchParen (orange)
-    ["#737c8c"] = "8",   -- Special (gray)
+    ["#e06c75"] = "168", -- Statement (pink/red)
+    ["#98c379"] = "108", -- String (green)
+    ["#bf79c3"] = "139", -- Number, Boolean (purple)
+    ["#61afef"] = "75",  -- Function (blue)
+    ["#d19a66"] = "173", -- Search (orange)
     ["#df334a"] = "167", -- Error (bright red)
     ["#c678dd"] = "176", -- PreProc (light purple)
     ["#3b4049"] = "237", -- Visual background
-    ["#e0e0e0"] = "252", -- Very light gray (Identifier)
+    ["#e0e0e0"] = "252", -- Light gray (Identifier)
 
-    -- Standard ANSI terminal to GUI mappings
-    ["#000000"] = "0", -- Black
-    ["#CC0000"] = "1", -- Red
-    ["#4E9A06"] = "2", -- Green
-    ["#C4A000"] = "3", -- Yellow/Brown
-    ["#3465A4"] = "4", -- Blue
-    ["#75507B"] = "5", -- Magenta
-    ["#06989A"] = "6", -- Cyan
-    ["#D3D7CF"] = "7", -- White/Light gray
-    ["#555753"] = "8", -- Bright black (gray)
-    ["#EF2929"] = "9", -- Bright red
-    ["#8AE234"] = "10", -- Bright green
-    ["#FCE94F"] = "11", -- Bright yellow
-    ["#729FCF"] = "12", -- Bright blue
-    ["#AD7FA8"] = "13", -- Bright magenta
-    ["#34E2E2"] = "14", -- Bright cyan
-    ["#EEEEEC"] = "15" -- Bright white
+    -- ANSI terminal to GUI mappings
+    ["#000000"] = "0",   -- Black
+    ["#CC0000"] = "1",   -- Red
+    ["#4E9A06"] = "2",   -- Green
+    ["#C4A000"] = "3",   -- Yellow
+    ["#3465A4"] = "4",   -- Blue
+    ["#75507B"] = "5",   -- Magenta
+    ["#06989A"] = "6",   -- Cyan
+    ["#D3D7CF"] = "7",   -- White/Light gray
+    ["#555753"] = "8",   -- Gray
+    ["#EF2929"] = "9",   -- Bright red
+    ["#8AE234"] = "10",  -- Bright green
+    ["#FCE94F"] = "11",  -- Bright yellow
+    ["#729FCF"] = "12",  -- Bright blue
+    ["#AD7FA8"] = "13",  -- Bright magenta
+    ["#34E2E2"] = "14",  -- Bright cyan
+    ["#EEEEEC"] = "15"   -- Bright white
   }
 
   return known_mappings
@@ -399,11 +386,9 @@ function M.run_analysis()
     vim.cmd("BasicMode")
   end
 
-  -- Wait for highlighting to apply
+  -- Wait for highlighting to apply and get the other mode's results
   vim.cmd("redraw!")
-  vim.cmd("sleep 200m") -- Longer sleep to ensure highlighting is fully applied
-
-  -- Get the other mode's results
+  vim.cmd("sleep 200m") -- Ensure highlighting is fully applied
   local other_mode = vim.g.basic_mode and "BasicMode" or "GUIMode"
   local other_results = M.capture_current_highlights()
 
@@ -413,10 +398,7 @@ function M.run_analysis()
   else
     vim.cmd("GUIMode")
   end
-
-  -- Wait for highlighting to restore
   vim.cmd("redraw!")
-  vim.cmd("sleep 200m")
 
   -- Combine results
   local combined_results = M.combine_mode_results(
