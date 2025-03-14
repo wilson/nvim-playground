@@ -256,6 +256,151 @@ is_package_installed() {
   return 1
 }
 
+# Try to install a package using a specific method
+try_install_with_method() {
+  local package_type="$1"  # "server" or "linter"
+  local package_name="$2"
+  local install_method="$3"  # "mason", "brew", "npm", etc.
+  local install_cmd="$4"     # Command to run for installation
+  # Get package info from config
+  local pkg_info
+  pkg_info=$(get_install_method "$package_type" "$package_name" "$install_method")
+  if [ -n "$pkg_info" ]; then
+    if [ $QUIET_MODE -eq 0 ]; then
+      echo "Installing $package_name with $install_method..."
+    fi
+
+    # All package managers now use the same command format
+    if $install_cmd "$pkg_info"; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+# Handle github installation specially
+try_github_install() {
+  local package_name="$1"
+  local github_repo="$2"
+
+  if [ -n "$github_repo" ] && command_exists git; then
+    if [ $QUIET_MODE -eq 0 ]; then
+      echo "Installing $package_name from GitHub ($github_repo)..."
+    fi
+
+    # Extract repo and tag/branch
+    local repo_url
+    local tag_or_branch
+
+    # Parse GitHub repo#tag format
+    if [[ "$github_repo" == *"#"* ]]; then
+      repo_url="https://github.com/${github_repo%%#*}.git"
+      tag_or_branch="${github_repo#*#}"
+    else
+      repo_url="https://github.com/$github_repo.git"
+      tag_or_branch="main"
+    fi
+
+    # Special case for luau_lsp
+    if [[ "$repo_url" == *"JohnnyMorganz/luau-lsp"* ]]; then
+      if command_exists cmake; then
+        local temp_dir
+        temp_dir=$(mktemp -d)
+        cd "$temp_dir" || {
+          echo "Failed to create or change to temporary directory"
+          return 1
+        }
+
+        # Clone the repo
+        git clone "$repo_url"
+        cd luau-lsp || {
+          echo "Failed to change to luau-lsp directory"
+          return 1
+        }
+        git checkout "$tag_or_branch"
+
+        # Build following README instructions
+        mkdir build
+        cd build || {
+          echo "Failed to change to build directory"
+          return 1
+        }
+        cmake .. -DCMAKE_BUILD_TYPE=Release || {
+          echo "Failed to run cmake configuration"
+          return 1
+        }
+        cmake --build . --target Luau.LanguageServer.CLI --config Release || {
+          echo "Failed to build Luau.LanguageServer.CLI"
+          return 1
+        }
+
+        # Install to a location in PATH
+        if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
+          echo "Installing to /usr/local/bin/luau-lsp"
+          cp CLI/Luau.LanguageServer.CLI /usr/local/bin/luau-lsp
+        elif [ -d "$HOME/.local/bin" ]; then
+          echo "Installing to $HOME/.local/bin/luau-lsp"
+          mkdir -p "$HOME/.local/bin"
+          cp CLI/Luau.LanguageServer.CLI "$HOME/.local/bin/luau-lsp"
+        else
+          echo "Installing to current working directory"
+          cp CLI/Luau.LanguageServer.CLI "$HOME/luau-lsp"
+          echo "You should move $HOME/luau-lsp to a directory in your PATH"
+        fi
+
+        # Clean up
+        cd "$OLDPWD"
+        rm -rf "$temp_dir"
+
+        return 0
+      fi
+    fi
+  fi
+  return 1
+}
+
+# Update tracking lists when installation fails
+update_tracking_lists() {
+  local package_type="$1"
+  local package_name="$2"
+  local tracking_list_name="$3"
+  local failed_list_name="$4"
+
+  if [ "$tracking_list_name" = "INSTALLED_SERVERS" ]; then
+    # Filter out the failed package from installed list
+    local i=0
+    local new_installed_servers=()
+    for server in "${INSTALLED_SERVERS[@]}"; do
+      if [ "$server" != "$package_name" ]; then
+        new_installed_servers[i]="$server"
+        ((i++))
+      fi
+    done
+    INSTALLED_SERVERS=("${new_installed_servers[@]}")
+
+    # Add to failed list
+    if [ "$failed_list_name" = "FAILED_SERVERS" ]; then
+      FAILED_SERVERS+=("$package_name")
+    fi
+  elif [ "$tracking_list_name" = "INSTALLED_LINTERS" ]; then
+    # Filter out the failed package from installed list
+    local i=0
+    local new_installed_linters=()
+    for linter in "${INSTALLED_LINTERS[@]}"; do
+      if [ "$linter" != "$package_name" ]; then
+        new_installed_linters[i]="$linter"
+        ((i++))
+      fi
+    done
+    INSTALLED_LINTERS=("${new_installed_linters[@]}")
+
+    # Add to failed list
+    if [ "$failed_list_name" = "FAILED_LINTERS" ]; then
+      FAILED_LINTERS+=("$package_name")
+    fi
+  fi
+}
+
 # Generic function to install a package (server or linter)
 install_package() {
   local package_type="$1"  # "server" or "linter"
@@ -299,218 +444,43 @@ install_package() {
     fi
   fi
 
-  # Try Homebrew installation if available
+  # Try Homebrew
   if command_exists brew; then
-    local brew_package
-    brew_package=$(get_install_method "$package_type" "$package_name" "brew")
-    if [ -n "$brew_package" ]; then
-      if [ $QUIET_MODE -eq 0 ]; then
-        echo "Installing $package_name with Homebrew..."
-      fi
-      if brew install "$brew_package"; then
-        return 0
-      fi
+    if try_install_with_method "$package_type" "$package_name" "brew" "brew install"; then
+      return 0
     fi
   fi
 
-  # Try npm installation if available
-  if command_exists npm; then
-    local npm_package
-    npm_package=$(get_install_method "$package_type" "$package_name" "npm")
-    if [ -n "$npm_package" ]; then
-      if [ $QUIET_MODE -eq 0 ]; then
-        echo "Installing $package_name with npm..."
-      fi
-      if npm install -g "$npm_package"; then
-        return 0
-      fi
-    fi
-  fi
+  # Try various package managers
+  local package_managers=("npm" "pip3" "gem" "cargo" "luarocks" "rustup")
+  local commands=("npm install -g" "pip3 install" "gem install" "cargo install" "luarocks install --local" "rustup")
 
-  # Try pip installation if available
-  if command_exists pip3; then
-    local pip_package
-    pip_package=$(get_install_method "$package_type" "$package_name" "pip")
-    if [ -n "$pip_package" ]; then
-      if [ $QUIET_MODE -eq 0 ]; then
-        echo "Installing $package_name with pip..."
-      fi
-      if pip3 install "$pip_package"; then
-        return 0
-      fi
-    fi
-  fi
+  for i in "${!package_managers[@]}"; do
+    local pkg_manager="${package_managers[$i]}"
+    local install_cmd="${commands[$i]}"
 
-  # Try gem installation if available
-  if command_exists gem; then
-    local gem_package
-    gem_package=$(get_install_method "$package_type" "$package_name" "gem")
-    if [ -n "$gem_package" ]; then
-      if [ $QUIET_MODE -eq 0 ]; then
-        echo "Installing $package_name with gem..."
-      fi
-      if gem install "$gem_package"; then
-        return 0
-      fi
+    # Skip if package manager is not available
+    if ! command_exists "$pkg_manager"; then
+      continue
     fi
-  fi
 
-  # Try cargo installation if available
-  if command_exists cargo; then
-    local cargo_package
-    cargo_package=$(get_install_method "$package_type" "$package_name" "cargo")
-    if [ -n "$cargo_package" ]; then
-      if [ $QUIET_MODE -eq 0 ]; then
-        echo "Installing $package_name with cargo..."
-      fi
-      if cargo install "$cargo_package"; then
-        return 0
-      fi
+    if try_install_with_method "$package_type" "$package_name" "$pkg_manager" "$install_cmd"; then
+      return 0
     fi
-  fi
-
-  # Try luarocks installation if available
-  if command_exists luarocks; then
-    local luarocks_package
-    luarocks_package=$(get_install_method "$package_type" "$package_name" "luarocks")
-    if [ -n "$luarocks_package" ]; then
-      if [ $QUIET_MODE -eq 0 ]; then
-        echo "Installing $package_name with LuaRocks..."
-      fi
-      if luarocks install --local "$luarocks_package"; then
-        return 0
-      fi
-    fi
-  fi
-
-  # Try rustup installation if available
-  if command_exists rustup; then
-    local rustup_command
-    rustup_command=$(get_install_method "$package_type" "$package_name" "rustup")
-    if [ -n "$rustup_command" ]; then
-      if [ $QUIET_MODE -eq 0 ]; then
-        echo "Installing $package_name with rustup..."
-      fi
-      if rustup "$rustup_command"; then
-        return 0
-      fi
-    fi
-  fi
+  done
 
   # Special case for GitHub installation (only for servers currently)
   if [ "$package_type" = "server" ]; then
     local github_repo
     github_repo=$(get_install_method "server" "$package_name" "github")
-    if [ -n "$github_repo" ] && command_exists git; then
-      if [ $QUIET_MODE -eq 0 ]; then
-        echo "Installing $package_name from GitHub ($github_repo)..."
-      fi
-
-      # Extract repo and tag/branch
-      local repo_url
-      local tag_or_branch
-
-      # Parse GitHub repo#tag format
-      if [[ "$github_repo" == *"#"* ]]; then
-        repo_url="https://github.com/${github_repo%%#*}.git"
-        tag_or_branch="${github_repo#*#}"
-      else
-        repo_url="https://github.com/$github_repo.git"
-        tag_or_branch="main"
-      fi
-
-      # Special case for luau_lsp
-      if [[ "$repo_url" == *"JohnnyMorganz/luau-lsp"* ]]; then
-        if command_exists cmake; then
-          local temp_dir
-          temp_dir=$(mktemp -d)
-          cd "$temp_dir" || {
-            echo "Failed to create or change to temporary directory"
-            return 1
-          }
-
-          # Clone the repo
-          git clone "$repo_url"
-          cd luau-lsp || {
-            echo "Failed to change to luau-lsp directory"
-            return 1
-          }
-          git checkout "$tag_or_branch"
-
-          # Build following README instructions
-          mkdir build
-          cd build || {
-            echo "Failed to change to build directory"
-            return 1
-          }
-          cmake .. -DCMAKE_BUILD_TYPE=Release || {
-            echo "Failed to run cmake configuration"
-            return 1
-          }
-          cmake --build . --target Luau.LanguageServer.CLI --config Release || {
-            echo "Failed to build Luau.LanguageServer.CLI"
-            return 1
-          }
-
-          # Install to a location in PATH
-          if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
-            echo "Installing to /usr/local/bin/luau-lsp"
-            cp CLI/Luau.LanguageServer.CLI /usr/local/bin/luau-lsp
-          elif [ -d "$HOME/.local/bin" ]; then
-            echo "Installing to $HOME/.local/bin/luau-lsp"
-            mkdir -p "$HOME/.local/bin"
-            cp CLI/Luau.LanguageServer.CLI "$HOME/.local/bin/luau-lsp"
-          else
-            echo "Installing to current working directory"
-            cp CLI/Luau.LanguageServer.CLI "$HOME/luau-lsp"
-            echo "You should move $HOME/luau-lsp to a directory in your PATH"
-          fi
-
-          # Clean up
-          cd "$OLDPWD"
-          rm -rf "$temp_dir"
-
-          return 0
-        fi
-      fi
+    if try_github_install "$package_name" "$github_repo"; then
+      return 0
     fi
   fi
 
   colored_echo "${RED}Failed to install $package_name - no suitable installation method found${RESET}"
   # Remove from installed list since installation failed
-  if [ "$tracking_list_name" = "INSTALLED_SERVERS" ]; then
-    # Filter out the failed package from installed list
-    local i=0
-    local new_installed_servers=()
-    for server in "${INSTALLED_SERVERS[@]}"; do
-      if [ "$server" != "$package_name" ]; then
-        new_installed_servers[i]="$server"
-        ((i++))
-      fi
-    done
-    INSTALLED_SERVERS=("${new_installed_servers[@]}")
-
-    # Add to failed list
-    if [ "$failed_list_name" = "FAILED_SERVERS" ]; then
-      FAILED_SERVERS+=("$package_name")
-    fi
-  elif [ "$tracking_list_name" = "INSTALLED_LINTERS" ]; then
-    # Filter out the failed package from installed list
-    local i=0
-    local new_installed_linters=()
-    for linter in "${INSTALLED_LINTERS[@]}"; do
-      if [ "$linter" != "$package_name" ]; then
-        new_installed_linters[i]="$linter"
-        ((i++))
-      fi
-    done
-    INSTALLED_LINTERS=("${new_installed_linters[@]}")
-
-    # Add to failed list
-    if [ "$failed_list_name" = "FAILED_LINTERS" ]; then
-      FAILED_LINTERS+=("$package_name")
-    fi
-  fi
+  update_tracking_lists "$package_type" "$package_name" "$tracking_list_name" "$failed_list_name"
   return 1
 }
 
@@ -520,16 +490,22 @@ install_language_server() {
   install_package "server" "$server" "INSTALLED_SERVERS" "FAILED_SERVERS"
 }
 
-# Install a linter using Mason
-install_linter_with_mason() {
-  local linter_name="$1"
-  local mason_name="${2:-$linter_name}" # Use the provided mason name or default to linter name
+# Common function for Mason installations
+mason_install_package() {
+  local package_type="$1"
+  local package_name="$2"
+  local mason_name="${3:-$package_name}"
 
-  echo "Installing $linter_name with Mason..."
+  if [ $QUIET_MODE -eq 0 ]; then
+    echo "Installing $package_name with Mason..."
+  fi
+
   # Check if already installed by Mason
   if [ -f "$HOME/.local/share/nvim/mason/bin/$mason_name" ] || \
      ls "$HOME/.local/share/nvim/mason/packages/$mason_name" &>/dev/null; then
-    colored_echo "${GREEN}$linter_name is already installed via Mason${RESET}"
+    if [ $QUIET_MODE -eq 0 ]; then
+      colored_echo "${GREEN}$package_name is already installed via Mason${RESET}"
+    fi
     return 0
   fi
 
@@ -546,6 +522,11 @@ install_linter_with_mason() {
   else
     return 1
   fi
+}
+
+# Install a linter using Mason
+install_linter_with_mason() {
+  mason_install_package "linter" "$1" "$2"
 }
 
 # Wrapper function for installing linters
@@ -769,30 +750,7 @@ suppress_npm_messages() {
 
 # Install a language server using Mason
 install_with_mason() {
-  local server_name="$1"
-  local mason_name="${2:-$server_name}" # Use the provided mason name or default to server name
-
-  echo "Installing $server_name with Mason..."
-  # Check if already installed by Mason
-  if [ -f "$HOME/.local/share/nvim/mason/bin/$mason_name" ] || \
-     ls "$HOME/.local/share/nvim/mason/packages/$mason_name" &>/dev/null; then
-    colored_echo "${GREEN}$server_name is already installed via Mason${RESET}"
-    return 0
-  fi
-
-  # Create temp file for nvim output
-  local NVIM_OUTPUT
-  NVIM_OUTPUT=$(mktemp)
-  nvim --headless -c "MasonInstall $mason_name" -c "sleep 1500m" -c "qa" > "$NVIM_OUTPUT" 2>&1
-  rm -f "$NVIM_OUTPUT"
-
-  # Check if installation was successful
-  if [ -f "$HOME/.local/share/nvim/mason/bin/$mason_name" ] || \
-     ls "$HOME/.local/share/nvim/mason/packages/$mason_name" &>/dev/null; then
-    return 0
-  else
-    return 1
-  fi
+  mason_install_package "server" "$1" "$2"
 }
 
 # Main function
