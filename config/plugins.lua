@@ -20,7 +20,7 @@ function M.setup(languages_config)
           vim.opt.termguicolors = true
           -- Make sure the colorscheme is available by checking if the plugin path exists
           local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/little-wonder")
-          if vim.fn.isdirectory(plugin_path) == 1 then
+          if vim.fn.isdirectory(plugin_path) ~= 0 then
             pcall(vim.cmd, "colorscheme lw-rubber")
           else
             vim.notify("little-wonder plugin not found. Colorscheme not applied.", vim.log.levels.WARN)
@@ -57,7 +57,8 @@ function M.setup(languages_config)
         -- Set up global LSP functionality
         local lspconfig = require("lspconfig")
         -- Standard keybindings for all LSP servers
-        local on_attach = function(client, bufnr)
+        local on_attach = function(_, bufnr)
+          -- Use _ instead of client to indicate unused parameter
           local opts = { noremap=true, silent=true, buffer=bufnr }
           vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
           vim.keymap.set('n', 'K', vim.lsp.buf.hover, opts)
@@ -277,7 +278,7 @@ function M.setup_treesitter_commands()
     local cache_dir = vim.fn.stdpath("cache")
     local parser_dir = cache_dir .. "/treesitter"
     -- Check if the directory exists
-    if vim.fn.isdirectory(parser_dir) == 1 then
+    if vim.fn.isdirectory(parser_dir) ~= 0 then
       -- Remove the parser directory
       vim.fn.delete(parser_dir, "rf")
       vim.notify("TreeSitter parser cache deleted. Restart Neovim to reinstall parsers.", vim.log.levels.INFO)

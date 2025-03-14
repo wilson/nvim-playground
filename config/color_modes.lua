@@ -187,7 +187,7 @@ function M.setup_commands()
     vim.opt.termguicolors = true
     -- Make sure the colorscheme is available by checking if the plugin path exists
     local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/little-wonder")
-    if vim.fn.isdirectory(plugin_path) == 1 then
+    if vim.fn.isdirectory(plugin_path) ~= 0 then
       pcall(vim.cmd, "colorscheme lw-rubber")
     else
       vim.notify("little-wonder plugin not found. Colorscheme not applied.", vim.log.levels.WARN)
