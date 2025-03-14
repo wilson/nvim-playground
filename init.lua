@@ -30,7 +30,7 @@ end
 function init.basic_setup()
   -- Basic settings
   vim.opt.number = true               -- Show line numbers
-  vim.opt.relativenumber = true       -- Show relative line numbers
+  vim.opt.relativenumber = false      -- Use absolute line numbers
   vim.opt.cursorline = true           -- Highlight current line
   vim.opt.tabstop = 2                 -- Number of spaces per tab
   vim.opt.shiftwidth = 2              -- Number of spaces for indent
