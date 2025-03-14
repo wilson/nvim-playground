@@ -74,8 +74,8 @@ function init.setup()
   init.setup_basic_mode()
 
   -- Default leader key
-  vim.g.mapleader = " "
-  vim.g.maplocalleader = " "
+  vim.g.mapleader = "\\"
+  vim.g.maplocalleader = "\\"
 
   -- Load languages configuration
   local languages_config = load_language_config()
