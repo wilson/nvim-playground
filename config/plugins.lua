@@ -39,27 +39,43 @@ function M.setup(languages_config)
     -- JSON/YAML Schema Store
     {
       "b0o/schemastore.nvim",
-      lazy = true,
+      priority = 950, -- Load early to ensure it's available for LSP setup
     },
 
+    -- Mason for managing LSP servers
+    {
+      "williamboman/mason.nvim",
+      priority = 900, -- Load before lspconfig
+      config = function()
+        require("mason").setup({})
+      end
+    },
+    -- Mason-lspconfig bridge
+    {
+      "williamboman/mason-lspconfig.nvim",
+      dependencies = {
+        "williamboman/mason.nvim",
+      },
+      priority = 800, -- Load after mason but before lspconfig
+      config = function()
+        require("mason-lspconfig").setup({
+          ensure_installed = languages_config.language_servers or {},
+          automatic_installation = true,
+        })
+      end,
+    },
     -- LSP Configuration
     {
       "neovim/nvim-lspconfig",
+      dependencies = {
+        "hrsh7th/cmp-nvim-lsp",
+        "williamboman/mason.nvim",
+        "williamboman/mason-lspconfig.nvim",
+      },
+      priority = 700, -- Load after mason and mason-lspconfig
       config = function()
         -- Set up LSP keymaps and configurations
         local lspconfig = require("lspconfig")
-
-        -- Configure Mason integration if available
-        local mason_ok, _ = pcall(require, "mason")
-        local mason_lspconfig_ok, _ = pcall(require, "mason-lspconfig")
-
-        if mason_ok and mason_lspconfig_ok then
-          require("mason").setup({})
-          require("mason-lspconfig").setup({
-            ensure_installed = languages_config.lsp_servers or {},
-            automatic_installation = true,
-          })
-        end
 
         -- Global on_attach function for all language servers
         local on_attach = function(client, bufnr)
@@ -75,49 +91,48 @@ function M.setup(languages_config)
         end
 
         -- Global capabilities for all language servers
-        local capabilities = require("cmp_nvim_lsp").default_capabilities()
+        local capabilities = vim.lsp.protocol.make_client_capabilities()
+        local cmp_ok, cmp_nvim_lsp = pcall(require, "cmp_nvim_lsp")
+        if cmp_ok then
+          capabilities = cmp_nvim_lsp.default_capabilities(capabilities)
+        end
 
-        -- Set up each language server with its specific settings
-        local servers = languages_config.language_servers or {}
+        -- Let mason-lspconfig handle the setup
         local server_settings = languages_config.server_settings or {}
-        -- Note: we're using vim.deepcopy instead of recursive table merging
-        -- Setup each language server
-        for _, lsp in ipairs(servers) do
-          local server_config = {
-            on_attach = on_attach,
-            capabilities = capabilities,
-          }
-          -- If there are server-specific settings, add them
-          if server_settings[lsp] then
-            -- Deep merge settings
-            if server_settings[lsp].settings then
-              server_config.settings = server_settings[lsp].settings
-            end
-            -- Add other properties like filetypes if specified
-            for k, v in pairs(server_settings[lsp]) do
-              if k ~= "settings" and k ~= "setup" then
-                server_config[k] = v
+        -- Hook into mason-lspconfig's setup_handlers
+        require("mason-lspconfig").setup_handlers({
+          -- Default handler for installed servers
+          function(server_name)
+            local server_config = {
+              on_attach = on_attach,
+              capabilities = capabilities,
+            }
+            -- If there are server-specific settings, add them
+            if server_settings[server_name] then
+              -- Add settings if provided
+              if server_settings[server_name].settings then
+                server_config.settings = server_settings[server_name].settings
+              end
+              -- Add other properties like filetypes if specified
+              for k, v in pairs(server_settings[server_name]) do
+                if k ~= "settings" and k ~= "setup" then
+                  server_config[k] = v
+                end
+              end
+              -- If the server has a custom setup function, call it
+              if server_settings[server_name].setup then
+                -- Create a copy of the server config for the setup function
+                local setup_config = vim.deepcopy(server_config)
+                server_settings[server_name].setup(setup_config)
+                -- Update the server_config with any changes made by the setup function
+                server_config = setup_config
               end
             end
-            -- If the server has a custom setup function, call it
-            if server_settings[lsp].setup then
-              -- Create a copy of the server config for the setup function
-              local setup_config = vim.deepcopy(server_config)
-              server_settings[lsp].setup(setup_config)
-              -- Update the server_config with any changes made by the setup function
-              server_config = setup_config
-            end
-          end
-          -- Setup the language server with the final configuration
-          pcall(function() lspconfig[lsp].setup(server_config) end)
-        end
+            -- Configure the server
+            lspconfig[server_name].setup(server_config)
+          end,
+        })
       end,
-    },
-
-    -- Mason for managing LSP servers
-    {
-      "williamboman/mason.nvim",
-      dependencies = { "williamboman/mason-lspconfig.nvim" },
     },
 
     -- Autocompletion
