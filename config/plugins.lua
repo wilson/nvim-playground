@@ -36,6 +36,11 @@ function M.setup(languages_config)
       "github/copilot.vim",
       lazy = false, -- Load immediately to ensure it's properly recognized
     },
+    -- JSON/YAML Schema Store
+    {
+      "b0o/schemastore.nvim",
+      lazy = true,
+    },
 
     -- LSP Configuration
     {
@@ -56,13 +61,55 @@ function M.setup(languages_config)
           })
         end
 
-        -- Use a loop to conveniently call 'setup' on multiple servers
-        local servers = languages_config.lsp_servers or {}
+        -- Global on_attach function for all language servers
+        local on_attach = function(client, bufnr)
+          -- Set up buffer-local keymaps, etc.
+          -- Common LSP functionality
+          local opts = { noremap=true, silent=true, buffer=bufnr }
+          vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
+          vim.keymap.set('n', 'K', vim.lsp.buf.hover, opts)
+          vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, opts)
+          vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, opts)
+          vim.keymap.set('n', 'gr', vim.lsp.buf.references, opts)
+          vim.keymap.set('n', '<leader>f', function() vim.lsp.buf.format { async = true } end, opts)
+        end
+
+        -- Global capabilities for all language servers
+        local capabilities = require("cmp_nvim_lsp").default_capabilities()
+
+        -- Set up each language server with its specific settings
+        local servers = languages_config.language_servers or {}
+        local server_settings = languages_config.server_settings or {}
+        -- Note: we're using vim.deepcopy instead of recursive table merging
+        -- Setup each language server
         for _, lsp in ipairs(servers) do
-          lspconfig[lsp].setup({
-            on_attach = function(client, bufnr) end,
-            capabilities = require("cmp_nvim_lsp").default_capabilities(),
-          })
+          local server_config = {
+            on_attach = on_attach,
+            capabilities = capabilities,
+          }
+          -- If there are server-specific settings, add them
+          if server_settings[lsp] then
+            -- Deep merge settings
+            if server_settings[lsp].settings then
+              server_config.settings = server_settings[lsp].settings
+            end
+            -- Add other properties like filetypes if specified
+            for k, v in pairs(server_settings[lsp]) do
+              if k ~= "settings" and k ~= "setup" then
+                server_config[k] = v
+              end
+            end
+            -- If the server has a custom setup function, call it
+            if server_settings[lsp].setup then
+              -- Create a copy of the server config for the setup function
+              local setup_config = vim.deepcopy(server_config)
+              server_settings[lsp].setup(setup_config)
+              -- Update the server_config with any changes made by the setup function
+              server_config = setup_config
+            end
+          end
+          -- Setup the language server with the final configuration
+          pcall(function() lspconfig[lsp].setup(server_config) end)
         end
       end,
     },

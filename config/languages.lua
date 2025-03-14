@@ -53,6 +53,171 @@ M.treesitter_parsers = {
   "c", "bash"
 }
 
+-- Server-specific configurations for LSP
+-- These will be passed to the respective language server setup
+M.server_settings = {
+  -- Lua language server configuration
+  lua_ls = {
+    settings = {
+      Lua = {
+        runtime = {
+          version = "LuaJIT",
+        },
+        diagnostics = {
+          globals = { "vim" },  -- Recognize vim global
+        },
+        workspace = {
+          -- Make server aware of Neovim runtime files
+          library = vim.api.nvim_get_runtime_file("", true),
+          checkThirdParty = false,
+        },
+        telemetry = {
+          enable = false,
+        },
+      },
+    },
+  },
+  -- Rust analyzer configuration
+  rust_analyzer = {
+    settings = {
+      ["rust-analyzer"] = {
+        imports = {
+          granularity = {
+            group = "module",
+          },
+        },
+        checkOnSave = {
+          command = "clippy",
+        },
+        inlayHints = {
+          enable = true,
+          typeHints = {
+            enable = true,
+          },
+          parameterHints = {
+            enable = true,
+          },
+        },
+      },
+    },
+  },
+  -- Python configuration
+  pyright = {
+    settings = {
+      python = {
+        analysis = {
+          autoSearchPaths = true,
+          diagnosticMode = "workspace",
+          useLibraryCodeForTypes = true,
+        },
+      },
+    },
+  },
+  -- Ruby LSP configuration
+  ruby_lsp = {
+    init_options = {
+      formatter = true,
+    },
+    settings = {
+      rubocop = {
+        enable = true,
+        configFilePath = ".rubocop.yml",
+      },
+    },
+  },
+  -- JSON configuration with schema support
+  jsonls = {
+    settings = {
+      json = {
+        validate = { enable = true },
+      },
+    },
+    setup = function(server)
+      -- Check if schemastore plugin is available
+      local has_schemastore, schemastore = pcall(require, "schemastore")
+      -- Only apply schema settings if schemastore is available
+      if has_schemastore then
+        server.settings.json.schemas = schemastore.json.schemas()
+      end
+    end,
+  },
+  -- YAML configuration
+  yamlls = {
+    settings = {
+      yaml = {
+        schemaStore = {
+          enable = true,
+          url = "https://www.schemastore.org/api/json/catalog.json",
+        },
+      },
+    },
+    setup = function(server)
+      -- Will only be used if schemastore plugin is installed
+      local has_schemastore, schemastore = pcall(require, "schemastore")
+      if has_schemastore then
+        server.settings.yaml.schemas = schemastore.yaml.schemas()
+      end
+    end,
+  },
+  -- TOML configuration
+  taplo = {
+    settings = {
+      taplo = {
+        diagnostics = {
+          enable = true,
+        },
+        formatter = {
+          enable = true,
+        },
+      },
+    },
+  },
+  -- TypeScript/JavaScript configuration
+  vtsls = {
+    settings = {
+      typescript = {
+        inlayHints = {
+          includeInlayParameterNameHints = "all",
+          includeInlayParameterNameHintsWhenArgumentMatchesName = false,
+          includeInlayFunctionParameterTypeHints = true,
+          includeInlayVariableTypeHints = true,
+          includeInlayPropertyDeclarationTypeHints = true,
+          includeInlayFunctionLikeReturnTypeHints = true,
+          includeInlayEnumMemberValueHints = true,
+        },
+        format = {
+          enable = true,
+          indentSize = 2,
+        },
+      },
+      javascript = {
+        inlayHints = {
+          includeInlayParameterNameHints = "all",
+          includeInlayParameterNameHintsWhenArgumentMatchesName = false,
+          includeInlayFunctionParameterTypeHints = true,
+          includeInlayVariableTypeHints = true,
+          includeInlayPropertyDeclarationTypeHints = true,
+          includeInlayFunctionLikeReturnTypeHints = true,
+          includeInlayEnumMemberValueHints = true,
+        },
+        format = {
+          enable = true,
+          indentSize = 2,
+        },
+      },
+    },
+  },
+  -- Bash language server
+  bashls = {
+    filetypes = { "sh", "bash" },
+    settings = {
+      bashIde = {
+        shellcheckPath = "shellcheck",
+      },
+    },
+  },
+}
+
 -- Installation methods for language servers
 M.server_install_info = {
   lua_ls = {
