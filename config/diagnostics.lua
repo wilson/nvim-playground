@@ -126,13 +126,13 @@ function M.add_color_test_blocks(buf)
   vim.api.nvim_buf_set_lines(buf, -1, -1, false, {
     "ANSI 16-Color Test:",
     "  Normal FG colors (30-37, 90-97):",
-    "  ■ ■ ■ ■",
-    "  ■ ■ ■ ■",
-    "  ■ ■ ■ ■",
-    "  ■ ■ ■ ■",
+    "  X X X X", -- Using X instead of ■ which may not render properly
+    "  X X X X",
+    "  X X X X",
+    "  X X X X",
     "  Normal BG colors (40-47, 100-107):",
-    "                ",
-    "                ",
+    "  XX XX XX XX XX XX XX XX",
+    "  XX XX XX XX XX XX XX XX",
     "",
     "Terminal 256-Color Test (16-255):",
   })
@@ -145,10 +145,10 @@ function M.add_color_test_blocks(buf)
 
   -- Add ANSI 16 foreground colors (lines 3-6)
   local ansi_colors = {
-    {30, 31, 32, 33}, -- Line 3
-    {34, 35, 36, 37}, -- Line 4
-    {90, 91, 92, 93}, -- Line 5
-    {94, 95, 96, 97}  -- Line 6
+    {30, 31, 32, 33}, -- Line 3 - black, red, green, yellow
+    {34, 35, 36, 37}, -- Line 4 - blue, magenta, cyan, white
+    {90, 91, 92, 93}, -- Line 5 - bright black, bright red, bright green, bright yellow
+    {94, 95, 96, 97}  -- Line 6 - bright blue, bright magenta, bright cyan, bright white
   }
 
   -- Apply foreground colors
@@ -179,13 +179,13 @@ function M.add_color_test_blocks(buf)
   end
 
   -- Apply background colors on lines 8-9
-  local bg_colors_1 = {40, 41, 42, 43, 44, 45, 46, 47}
-  local bg_colors_2 = {100, 101, 102, 103, 104, 105, 106, 107}
+  local bg_colors_1 = {40, 41, 42, 43, 44, 45, 46, 47} -- Standard colors
+  local bg_colors_2 = {100, 101, 102, 103, 104, 105, 106, 107} -- Bright colors
 
-  -- First line of background colors
+  -- First line of background colors (standard BG colors)
   for j, color in ipairs(bg_colors_1) do
-    local col_start = 2 + (j-1)*2
-    local col_end = col_start + 1
+    local col_start = 2 + (j-1)*3
+    local col_end = col_start + 2
 
     -- Create highlight group for background
     local hl_group = "DiagBgColor" .. color
@@ -205,10 +205,10 @@ function M.add_color_test_blocks(buf)
     vim.api.nvim_buf_add_highlight(buf, ns_id, hl_group, line_count - 4, col_start, col_end)
   end
 
-  -- Second line of background colors
+  -- Second line of background colors (bright BG colors)
   for j, color in ipairs(bg_colors_2) do
-    local col_start = 2 + (j-1)*2
-    local col_end = col_start + 1
+    local col_start = 2 + (j-1)*3
+    local col_end = col_start + 2
 
     -- Create highlight group for background
     local hl_group = "DiagBgColor" .. color
@@ -228,12 +228,12 @@ function M.add_color_test_blocks(buf)
     vim.api.nvim_buf_add_highlight(buf, ns_id, hl_group, line_count - 3, col_start, col_end)
   end
 
-  -- Add 256 color palette
-  -- Create blocks of 16 colors per line
+  -- Add 256 color palette - use a clearer approach
+  -- Create blocks of 16 colors per line with visible characters
   for block = 0, 14 do
     local color_line = "  "
     for i = 0, 15 do
-      color_line = color_line .. "  "
+      color_line = color_line .. "XX "
     end
     vim.api.nvim_buf_set_lines(buf, -1, -1, false, {color_line})
 
@@ -244,7 +244,7 @@ function M.add_color_test_blocks(buf)
     for i = 0, 15 do
       local color_idx = 16 + block * 16 + i
       if color_idx <= 255 then
-        local col_start = 2 + i*2
+        local col_start = 2 + i*3
         local col_end = col_start + 2
 
         -- Create highlight group for the color
