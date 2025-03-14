@@ -1,9 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env zsh
 #
 # Install language servers and linters for Neovim setup
 # This script ensures all development tools referenced in your Neovim configuration are installed
 # It reads configuration from languages.lua and installs all servers and linters defined there
-# It uses Mason when possible, falls back to homebrew, npm, and then to other installation methods
+# It uses Mason when possible, falls back to homebrew/pkg, npm, and then to other installation methods
+#
+# NOTE: This script is compatible with both bash and zsh, but uses zsh shebang for FreeBSD compatibility
+# For linting purposes, use: shellcheck --shell=bash install_dev_tools.sh
 #
 
 set -e  # Exit on any error
@@ -35,9 +38,27 @@ if [ "$SHOW_HELP" -eq 1 ]; then
   echo "  This script installs language servers and linters used by Neovim."
   echo "  It reads configuration from $HOME/.config/nvim/config/languages.lua"
   echo "  and installs all tools listed in language_servers and linters sections."
-  echo "  The script uses Mason, Homebrew, npm, gem, pip, cargo, etc. as needed."
+  echo "  The script uses Mason, Homebrew/pkg, npm, gem, pip, cargo, etc. as needed."
   exit 0
 fi
+
+# Detect operating system
+OS_TYPE="unknown"
+if [[ "$(uname)" == "Darwin" ]]; then
+  OS_TYPE="macos"
+elif [[ "$(uname)" == "FreeBSD" ]]; then
+  OS_TYPE="freebsd"
+elif [[ "$(uname)" == "Linux" ]]; then
+  OS_TYPE="linux"
+fi
+
+# NOTE: For FreeBSD users, you may need to adjust package names in
+# ~/.config/nvim/config/languages.lua if the installation fails with pkg.
+# Common naming patterns for FreeBSD packages are:
+# - Python packages: py-packagename or py39-packagename
+# - Ruby gems: rubygem-packagename
+# - Node packages: npm-packagename
+# Search the FreeBSD ports collection with: pkg search packagename
 
 # Check if script is run in a terminal that supports colors
 # We need to ensure the output is properly formatted for the terminal
@@ -124,7 +145,7 @@ EOF
 get_install_method() {
   local item_type="$1"  # "server" or "linter"
   local item_name="$2"
-  local method="$3"     # "mason", "brew", "npm", etc.
+  local method="$3"     # "mason", "brew", "pkg", "npm", etc.
 
   local table_name=""
   if [ "$item_type" = "server" ]; then
@@ -174,8 +195,6 @@ INSTALLED_SERVERS=()
 FAILED_SERVERS=()
 INSTALLED_LINTERS=()
 FAILED_LINTERS=()
-
-# command_exists() function now defined at the top of the file
 
 # Helper function for installation commands
 run_install_command() {
@@ -260,7 +279,7 @@ is_package_installed() {
 try_install_with_method() {
   local package_type="$1"  # "server" or "linter"
   local package_name="$2"
-  local install_method="$3"  # "mason", "brew", "npm", etc.
+  local install_method="$3"  # "mason", "brew", "pkg", "npm", etc.
   local install_cmd="$4"     # Command to run for installation
   # Get package info from config
   local pkg_info
@@ -444,8 +463,12 @@ install_package() {
     fi
   fi
 
-  # Try Homebrew
-  if command_exists brew; then
+  # Try OS-specific package manager first
+  if [[ "$OS_TYPE" == "freebsd" ]] && command_exists pkg; then
+    if try_install_with_method "$package_type" "$package_name" "pkg" "pkg install -y"; then
+      return 0
+    fi
+  elif [[ "$OS_TYPE" == "macos" ]] && command_exists brew; then
     if try_install_with_method "$package_type" "$package_name" "brew" "brew install"; then
       return 0
     fi
@@ -540,26 +563,57 @@ check_prerequisites() {
   local missing=()
   local warnings=()
 
-  if ! command_exists brew; then
-    missing+=("Homebrew (https://brew.sh/)")
+  # OS-specific package manager check
+  if [[ "$OS_TYPE" == "freebsd" ]]; then
+    if ! command_exists pkg; then
+      missing+=("FreeBSD pkg package manager")
+    fi
+  elif [[ "$OS_TYPE" == "macos" ]]; then
+    if ! command_exists brew; then
+      missing+=("Homebrew (https://brew.sh/)")
+    fi
   fi
 
   if ! command_exists npm; then
-    missing+=("Node.js and npm (brew install node)")
+    if [[ "$OS_TYPE" == "freebsd" ]]; then
+      missing+=("Node.js and npm (pkg install node npm)")
+    elif [[ "$OS_TYPE" == "macos" ]]; then 
+      missing+=("Node.js and npm (brew install node)")
+    else
+      missing+=("Node.js and npm")
+    fi
   fi
 
   if ! command_exists cargo; then
-    missing+=("Rust and Cargo (brew install rustup-init)")
+    if [[ "$OS_TYPE" == "freebsd" ]]; then
+      missing+=("Rust and Cargo (pkg install rust cargo)")
+    elif [[ "$OS_TYPE" == "macos" ]]; then
+      missing+=("Rust and Cargo (brew install rustup-init)")
+    else
+      missing+=("Rust and Cargo")
+    fi
   elif ! command_exists rustup; then
     warnings+=("rustup command not found, but cargo exists. Some Rust tools may not install correctly")
   fi
 
   if ! command_exists pip3; then
-    missing+=("Python and pip (brew install python)")
+    if [[ "$OS_TYPE" == "freebsd" ]]; then
+      missing+=("Python and pip (pkg install python3 py39-pip)")
+    elif [[ "$OS_TYPE" == "macos" ]]; then
+      missing+=("Python and pip (brew install python)")
+    else
+      missing+=("Python and pip")
+    fi
   fi
 
   if ! command_exists gem; then
-    missing+=("Ruby and gem (brew install ruby)")
+    if [[ "$OS_TYPE" == "freebsd" ]]; then
+      missing+=("Ruby and gem (pkg install ruby rubygem-*)")
+    elif [[ "$OS_TYPE" == "macos" ]]; then
+      missing+=("Ruby and gem (brew install ruby)")
+    else
+      missing+=("Ruby and gem")
+    fi
   fi
 
   # Display missing prerequisites
@@ -569,7 +623,14 @@ check_prerequisites() {
       echo "  - $prereq"
     done
     colored_echo "\n${YELLOW}Some language servers may not install correctly without these prerequisites.${RESET}"
-    colored_echo "${YELLOW}Install them with Homebrew first for best results.${RESET}"
+    
+    if [[ "$OS_TYPE" == "freebsd" ]]; then
+      colored_echo "${YELLOW}Install them with pkg first for best results.${RESET}"
+    elif [[ "$OS_TYPE" == "macos" ]]; then
+      colored_echo "${YELLOW}Install them with Homebrew first for best results.${RESET}"
+    else
+      colored_echo "${YELLOW}Install them with your system's package manager for best results.${RESET}"
+    fi
 
     # Ask user if they want to continue anyway
     read -p "Continue anyway? (y/n) " -n 1 -r
@@ -731,12 +792,15 @@ EOF
 
 # Suppress Homebrew hints and cleanup messages
 suppress_brew_messages() {
-  # Check if environment variables are already set
-  if [[ -z "${HOMEBREW_NO_ENV_HINTS}" ]]; then
-    export HOMEBREW_NO_ENV_HINTS=1
-  fi
-  if [[ -z "${HOMEBREW_NO_INSTALL_CLEANUP}" ]]; then
-    export HOMEBREW_NO_INSTALL_CLEANUP=1
+  # Only do this on macOS
+  if [[ "$OS_TYPE" == "macos" ]]; then
+    # Check if environment variables are already set
+    if [[ -z "${HOMEBREW_NO_ENV_HINTS}" ]]; then
+      export HOMEBREW_NO_ENV_HINTS=1
+    fi
+    if [[ -z "${HOMEBREW_NO_INSTALL_CLEANUP}" ]]; then
+      export HOMEBREW_NO_INSTALL_CLEANUP=1
+    fi
   fi
 }
 
@@ -760,6 +824,7 @@ main() {
     echo "This script will install language servers and linters for Neovim"
     echo "Based on configuration in $HOME/.config/nvim/config/languages.lua"
     echo "Use --quiet or -q for less verbose output"
+    echo "Current OS: $OS_TYPE"
   fi
 
   # Check prerequisites
@@ -829,12 +894,17 @@ main() {
   colored_echo "\n${BLUE}You can manage language servers directly in Neovim with:${RESET}"
   colored_echo "${BLUE}  :Mason${RESET}"
 
-  # Key repeat fix is now handled by DYLD injection in the qt-keyrepeat-fix directory
-  if [[ "$(uname)" == "Darwin" ]] && command_exists nvim-qt; then
+  # OS-specific notes
+  if [[ "$OS_TYPE" == "macos" ]] && command_exists nvim-qt; then
     colored_echo "\n${BOLD}=== macOS Key Repeat Information ===${RESET}"
     colored_echo "${GREEN}Key repeat functionality for nvim-qt on macOS is now handled automatically${RESET}"
     colored_echo "${BLUE}The qt-keyrepeat-fix directory contains a DYLD injection library that fixes key repeat${RESET}"
     colored_echo "${BLUE}No additional configuration needed - the fix is applied automatically when nvim-qt starts${RESET}"
+  elif [[ "$OS_TYPE" == "freebsd" ]]; then
+    colored_echo "\n${BOLD}=== FreeBSD Information ===${RESET}"
+    colored_echo "${BLUE}On FreeBSD, make sure the required dependencies are installed via pkg:${RESET}"
+    colored_echo "${BLUE}  pkg install neovim node npm python3 py39-pip ruby${RESET}"
+    colored_echo "${BLUE}FreeBSD doesn't require the macOS-specific key repeat fix${RESET}"
   fi
 }
 
