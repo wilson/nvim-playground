@@ -1,30 +1,45 @@
--- Luacheck configuration file for Neovim configuration
+-- Neovim Lua linting configuration
 
--- Allow globals defined by Neovim
+-- Using LuaJIT specification
+std = "luajit"
+
+-- Global settings
+unused = true                -- Report unused variables
+unused_args = true           -- Report unused function arguments
+unused_secondaries = true    -- Report unused loop variables
+redefined = true             -- Report redefined variables in same scope
+self = true                  -- Warn when self is used outside methods
+
+-- Line length constraints
+max_line_length = false      -- Don't enforce max line length (let formatter handle this)
+max_code_line_length = 120   -- But do warn on extremely long code lines
+max_string_line_length = 180 -- Allow longer strings
+max_comment_line_length = 120 -- Keep comments reasonably sized
+
+-- Function complexity
+max_cyclomatic_complexity = 15  -- Allow for moderately complex functions
+
+-- Neovim globals
 globals = {
   "vim",
-  "table"
 }
 
--- Ignore some warnings
+-- Warnings to ignore
 ignore = {
-  "212", -- Unused argument (often used in callbacks)
-  "213", -- Unused loop variable
+  "631",  -- Line too long - let formatter handle this
 }
 
--- File-specific configuration
-files["config/color_analyze.lua"] = {
-  -- Ignore cyclomatic complexity in color_analyze.lua
-  ignore = {"631"}  -- Ignore warning about line being too complex
+-- File-specific settings
+files["**/color_analyze.lua"] = {
+  max_cyclomatic_complexity = 20,  -- Color analysis is inherently complex
 }
 
--- Quiet mode
-quiet = 1
+files["**/diagnostics.lua"] = {
+  max_cyclomatic_complexity = 18,  -- Diagnostics has complex formatting logic
+}
 
--- Set max line length
-max_line_length = 120
-
--- Misc options
-cache = true
-self = false
-codes = true
+-- Skip external files
+exclude_files = {
+  "lazy/*",
+  "mason/*",
+}

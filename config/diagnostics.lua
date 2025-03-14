@@ -232,7 +232,7 @@ function M.add_color_test_blocks(buf)
   -- Create blocks of 16 colors per line with visible characters
   for block = 0, 14 do
     local color_line = "  "
-    for i = 0, 15 do
+    for _ = 0, 15 do -- Use underscore for unused loop variable
       color_line = color_line .. "XX "
     end
     vim.api.nvim_buf_set_lines(buf, -1, -1, false, {color_line})
