@@ -77,17 +77,55 @@ function M.is_headless()
   return #vim.api.nvim_list_uis() == 0
 end
 
--- Font availability testing function with detailed logging capabilities
-function M.is_font_available(font_name, verbose)
-  -- Return cached result if available
+-- Initialize font cache and logging tables
+function M.init_font_detection()
   if not M._font_cache then
     M._font_cache = {}
   end
 
-  -- Store font detection steps if verbose logging is enabled
   if not M._font_detection_log then
     M._font_detection_log = {}
   end
+end
+
+-- Check if a font name is in the built-in macOS system fonts
+function M.check_macos_builtin_font(font_base, verbose)
+  -- SF Mono is handled separately now in is_font_available
+  -- so we don't need to check for it here
+
+  -- Built-in macOS system fonts
+  if font_base == "Menlo" or font_base == "Monaco" then
+    if verbose then
+      table.insert(M._font_detection_log[font_base],
+        "Built-in system font: " .. font_base .. " is available by default on macOS")
+    end
+
+    return true
+  end
+
+  return nil -- Not a built-in macOS font
+end
+
+-- Log font detection result and update cache
+function M.log_font_result(font_base, is_available, verbose)
+  M._font_cache[font_base] = is_available
+
+  if verbose then
+    if is_available then
+      table.insert(M._font_detection_log[font_base], "✓ Font found and marked as available")
+    else
+      table.insert(M._font_detection_log[font_base], "✗ Font not found in any location")
+      table.insert(M._font_detection_log[font_base], "Cached as unavailable for future checks")
+    end
+  end
+
+  return is_available
+end
+
+-- Font availability testing function with detailed logging capabilities
+function M.is_font_available(font_name, verbose)
+  -- Initialize cache and logging
+  M.init_font_detection()
 
   -- Extract the base font name (without size)
   local font_base = font_name:match("^([^:]+)")
@@ -107,32 +145,23 @@ function M.is_font_available(font_name, verbose)
     return M._font_cache[font_base]
   end
 
-  -- Check for built-in macOS system fonts first (most efficient)
+  -- We need special handling for SF Mono since it's a macOS font with a special naming scheme
+  if font_base == "SF Mono" and vim.fn.has("macunix") == 1 then
+    local sf_mono_path = vim.fn.expand("~/Library/Fonts/SF-Mono-Regular.otf")
+    if vim.fn.filereadable(sf_mono_path) == 1 then
+      if verbose then
+        table.insert(M._font_detection_log[font_base],
+          "✓ Found SF Mono at " .. sf_mono_path)
+      end
+      return M.log_font_result(font_base, true, verbose)
+    end
+  end
+
+  -- Check for built-in macOS system fonts
   if vim.fn.has("macunix") == 1 then
-    if font_base == "SF Mono" then
-      -- Check user fonts directory directly - use safer method than glob
-      local sf_fonts_path = vim.fn.expand("~/Library/Fonts/SF-Mono-Regular.otf")
-      local available = vim.fn.filereadable(sf_fonts_path) == 1
-
-      if verbose then
-        table.insert(M._font_detection_log[font_base],
-          "macOS SF Mono check: " ..
-          (available and "✓ Found at " or "✗ Not found at ") .. sf_fonts_path)
-      end
-
-      if available then
-        M._font_cache[font_base] = true
-        return true
-      end
-    elseif font_base == "Menlo" or font_base == "Monaco" then
-      -- These are always available on macOS
-      if verbose then
-        table.insert(M._font_detection_log[font_base],
-          "Built-in system font: " .. font_base .. " is available by default on macOS")
-      end
-
-      M._font_cache[font_base] = true
-      return true
+    local builtin_result = M.check_macos_builtin_font(font_base, verbose)
+    if builtin_result ~= nil then
+      return M.log_font_result(font_base, builtin_result, verbose)
     end
   end
 
@@ -147,19 +176,20 @@ function M.is_font_available(font_name, verbose)
   end
 
   -- No font files found - mark as unavailable
-  M._font_cache[font_base] = false
-
-  if verbose then
-    table.insert(M._font_detection_log[font_base],
-      "✗ Font not found in any location")
-    table.insert(M._font_detection_log[font_base], "Cached as unavailable for future checks")
-  end
-
-  return false
+  return M.log_font_result(font_base, false, verbose)
 end
 
 -- Helper function to check if a font exists in system font directories
 function M.check_system_font_dir_for_font(font_base)
+  -- Special case for SF Mono on macOS
+  if font_base == "SF Mono" and vim.fn.has("macunix") == 1 then
+    -- Mac users typically install SF Mono with this naming pattern from Terminal.app
+    local sf_mono_path = vim.fn.expand("~/Library/Fonts/SF-Mono-Regular.otf")
+    if vim.fn.filereadable(sf_mono_path) == 1 then
+      return true
+    end
+  end
+
   -- Get the standard font paths for the current OS
   local font_paths = M.get_system_font_dirs()
   local variants = M.get_common_font_variants()
@@ -173,6 +203,14 @@ function M.check_system_font_dir_for_font(font_base)
 
       if vim.fn.filereadable(ttf_path) == 1 or vim.fn.filereadable(otf_path) == 1 then
         return true
+      end
+
+      -- Special case for SF Mono which uses a different naming convention
+      if font_base == "SF Mono" then
+        local sf_path = path .. "SF-Mono-" .. variant .. ".otf"
+        if vim.fn.filereadable(sf_path) == 1 then
+          return true
+        end
       end
     end
 
@@ -227,76 +265,90 @@ function M.get_common_font_variants()
   }
 end
 
-function M.check_common_font_locations(font_base, verbose)
-  if vim.fn.has("macunix") == 1 then
-    -- Check common system font variants - more reliable than globbing
-    local font_variants = M.get_common_font_variants()
 
-    -- Try common paths for this font family
-    local base_paths = M.get_system_font_dirs()
+-- Helper function to check font file existence and handle logging
+function M.check_font_file(path, font_base, verbose, is_variant, variant_name)
+  local exists = vim.fn.filereadable(path) == 1
 
-    if verbose then
-      table.insert(M._font_detection_log[font_base], "Checking system font directories:")
-      for _, base_path in ipairs(base_paths) do
-        table.insert(M._font_detection_log[font_base], "  • " .. base_path)
-      end
+  if exists and verbose then
+    local ext = path:match("%.([^.]+)$"):upper()
+    local message
+
+    if is_variant then
+      message = "  ✓ Found " .. ext .. " variant " .. variant_name .. ": " .. path
+    else
+      message = "  ✓ Found " .. ext .. " font without variant suffix: " .. path
     end
 
-    -- Check for each font variant with each extension in each base path
-    for _, base_path in ipairs(base_paths) do
-      for _, variant in ipairs(font_variants) do
-        local ttf_path = base_path .. font_base .. "-" .. variant .. ".ttf"
-        local otf_path = base_path .. font_base .. "-" .. variant .. ".otf"
+    table.insert(M._font_detection_log[font_base], message)
+  end
 
-        -- Check if any variant exists
-        local ttf_exists = vim.fn.filereadable(ttf_path) == 1
-        local otf_exists = vim.fn.filereadable(otf_path) == 1
+  return exists
+end
 
-        if verbose and (ttf_exists or otf_exists) then
-          local found_path = ttf_exists and ttf_path or otf_path
-          local ext = ttf_exists and "TTF" or "OTF"
-          table.insert(M._font_detection_log[font_base], "  ✓ Found " .. ext .. " variant: " .. found_path)
-        end
+-- Check for font variants in a specific directory
+function M.check_font_variants_in_dir(base_path, font_base, variants, verbose)
+  -- Check variant fonts (e.g., Font-Regular.ttf)
+  for _, variant in ipairs(variants) do
+    local ttf_path = base_path .. font_base .. "-" .. variant .. ".ttf"
+    local otf_path = base_path .. font_base .. "-" .. variant .. ".otf"
 
-        if ttf_exists or otf_exists then
-          M._font_cache[font_base] = true
+    if M.check_font_file(ttf_path, font_base, verbose, true, variant) or
+       M.check_font_file(otf_path, font_base, verbose, true, variant) then
 
-          if verbose then
-            table.insert(M._font_detection_log[font_base], "  ✓ Font found, marking as available")
-          end
-
-          return true
-        end
-      end
-    end
-
-    -- Also check for no-suffix variants (e.g., "Arial.ttf" instead of "Arial-Regular.ttf")
-    for _, base_path in ipairs(base_paths) do
-      local ttf_path = base_path .. font_base .. ".ttf"
-      local otf_path = base_path .. font_base .. ".otf"
-
-      local ttf_exists = vim.fn.filereadable(ttf_path) == 1
-      local otf_exists = vim.fn.filereadable(otf_path) == 1
-
-      if verbose and (ttf_exists or otf_exists) then
-        local found_path = ttf_exists and ttf_path or otf_path
-        local ext = ttf_exists and "TTF" or "OTF"
-        table.insert(M._font_detection_log[font_base],
-          "  ✓ Found " .. ext .. " font without variant suffix: " .. found_path)
+      if verbose then
+        table.insert(M._font_detection_log[font_base], "  ✓ Font found, marking as available")
       end
 
-      if ttf_exists or otf_exists then
-        M._font_cache[font_base] = true
-        return true
-      end
-    end
-
-    if verbose then
-      table.insert(M._font_detection_log[font_base], "  ✗ Font not found in any system directories")
+      M._font_cache[font_base] = true
+      return true
     end
   end
 
-  -- No direct matches found, continue with other checks
+  -- Check base font with no variant (e.g., Font.ttf)
+  local ttf_path = base_path .. font_base .. ".ttf"
+  local otf_path = base_path .. font_base .. ".otf"
+
+  if M.check_font_file(ttf_path, font_base, verbose, false) or
+     M.check_font_file(otf_path, font_base, verbose, false) then
+
+    M._font_cache[font_base] = true
+    return true
+  end
+
+  return false
+end
+
+function M.check_common_font_locations(font_base, verbose)
+  -- Only macOS is currently fully implemented
+  if vim.fn.has("macunix") ~= 1 then
+    return nil
+  end
+
+  -- Get font variants and paths
+  local font_variants = M.get_common_font_variants()
+  local base_paths = M.get_system_font_dirs()
+
+  -- Log directories being checked
+  if verbose then
+    table.insert(M._font_detection_log[font_base], "Checking system font directories:")
+    for _, base_path in ipairs(base_paths) do
+      table.insert(M._font_detection_log[font_base], "  • " .. base_path)
+    end
+  end
+
+  -- Check each directory for the font
+  for _, base_path in ipairs(base_paths) do
+    if M.check_font_variants_in_dir(base_path, font_base, font_variants, verbose) then
+      return true
+    end
+  end
+
+  -- No font found after checking all directories
+  if verbose then
+    table.insert(M._font_detection_log[font_base], "  ✗ Font not found in any system directories")
+  end
+
   return nil
 end
 

@@ -31,10 +31,26 @@ function M.setup_color_analyze()
   end, {})
 end
 
+-- Setup FontMessages command
+function M.setup_font_messages()
+  -- Load the fonts module
+  local ok, fonts = pcall(require, "config.fonts")
+  if not ok then
+    vim.notify("Fonts module not found", vim.log.levels.ERROR)
+    return
+  end
+
+  -- Create the FontMessages command via the fonts module
+  fonts.setup_commands()
+end
+
 -- Setup all commands
 function M.setup()
   -- Set up ColorAnalyze command
   M.setup_color_analyze()
+
+  -- Set up FontMessages command
+  M.setup_font_messages()
 end
 
 return M

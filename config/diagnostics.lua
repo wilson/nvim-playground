@@ -155,14 +155,10 @@ function M.get_nvim_settings()
     table.insert(settings, "  GUI client: " .. gui_client .. gui_app_name)
 
     -- Get font information with improved detection and detailed process display
+    M.add_font_detection_header(settings)
     pcall(function()
       local font = "Unknown"
       local font_source = ""
-
-      -- Create a font section with detailed detection information
-      table.insert(settings, "")
-      table.insert(settings, "  Font Detection Details:")
-      table.insert(settings, "  " .. string.rep("═", 50))
 
       -- Add detection process information
       table.insert(settings, "  Detection process:")
@@ -299,44 +295,7 @@ function M.get_nvim_settings()
 
         -- If SF Mono and on macOS, check the file path with detailed info
         if font_name == "SF Mono" and vim.fn.has("macunix") == 1 then
-          -- Check user font directory
-          local user_path = vim.fn.expand("~/Library/Fonts/SF-Mono-Regular.otf")
-          local user_exists = vim.fn.filereadable(user_path) == 1
-          table.insert(settings, "      └ User fonts: " .. (user_exists and "✓ Found at " or "✗ Not found at ") .. user_path)
-
-          -- Check system font directory
-          local system_path = "/Library/Fonts/SF-Mono-Regular.otf"
-          local system_exists = vim.fn.filereadable(system_path) == 1
-          table.insert(settings, "      └ System fonts: " .. (system_exists and "✓ Found at " or "✗ Not found at ") .. system_path)
-
-          -- Check Terminal.app font directory (source for installation)
-          local terminal_path = "/System/Applications/Utilities/Terminal.app/Contents/Resources/Fonts/SF-Mono-Regular.otf"
-          local terminal_exists = vim.fn.filereadable(terminal_path) == 1
-          table.insert(settings, "      └ Terminal.app: " .. (terminal_exists and "✓ Available at " or "✗ Not available at ") .. terminal_path)
-
-          -- Check all variants in user font directory
-          table.insert(settings, "      └ Font variants in ~/Library/Fonts:")
-          local variants = {"Regular", "Bold", "RegularItalic", "BoldItalic", "Medium", "MediumItalic", "Light", "LightItalic"}
-          local variants_found = 0
-
-          for _, variant in ipairs(variants) do
-            local variant_path = vim.fn.expand("~/Library/Fonts/SF-Mono-" .. variant .. ".otf")
-            local variant_exists = vim.fn.filereadable(variant_path) == 1
-            if variant_exists then
-              variants_found = variants_found + 1
-              -- Only show the first few variants to avoid too much output
-              if variants_found <= 3 then
-                table.insert(settings, "        ✓ SF-Mono-" .. variant .. ".otf")
-              end
-            end
-          end
-
-          -- Show summary if there are more variants
-          if variants_found > 3 then
-            table.insert(settings, "        ... and " .. (variants_found - 3) .. " more variant(s)")
-          elseif variants_found == 0 then
-            table.insert(settings, "        ✗ No variants found")
-          end
+          M.add_sf_mono_details(settings)
         end
       end
 
@@ -957,6 +916,55 @@ function M.add_recommendations(buf)
         vim.api.nvim_buf_add_highlight(buf, ns_id, "Type", line_num, 18, 33)
       end
     end
+  end
+end
+
+-- Helper function to add font detection header
+function M.add_font_detection_header(settings)
+  table.insert(settings, "")
+  table.insert(settings, "  Font Detection Details:")
+  table.insert(settings, "  " .. string.rep("═", 50))
+end
+
+-- Helper function to check SF Mono font locations and variants
+function M.add_sf_mono_details(settings)
+  -- Check user font directory
+  local user_path = vim.fn.expand("~/Library/Fonts/SF-Mono-Regular.otf")
+  local user_exists = vim.fn.filereadable(user_path) == 1
+  table.insert(settings, "      └ User fonts: " .. (user_exists and "✓ Found at " or "✗ Not found at ") .. user_path)
+
+  -- Check system font directory
+  local system_path = "/Library/Fonts/SF-Mono-Regular.otf"
+  local system_exists = vim.fn.filereadable(system_path) == 1
+  table.insert(settings, "      └ System fonts: " .. (system_exists and "✓ Found at " or "✗ Not found at ") .. system_path)
+
+  -- Check Terminal.app font directory (source for installation)
+  local terminal_path = "/System/Applications/Utilities/Terminal.app/Contents/Resources/Fonts/SF-Mono-Regular.otf"
+  local terminal_exists = vim.fn.filereadable(terminal_path) == 1
+  table.insert(settings, "      └ Terminal.app: " .. (terminal_exists and "✓ Available at " or "✗ Not available at ") .. terminal_path)
+
+  -- Check all variants in user font directory
+  table.insert(settings, "      └ Font variants in ~/Library/Fonts:")
+  local variants = {"Regular", "Bold", "RegularItalic", "BoldItalic", "Medium", "MediumItalic", "Light", "LightItalic"}
+  local variants_found = 0
+
+  for _, variant in ipairs(variants) do
+    local variant_path = vim.fn.expand("~/Library/Fonts/SF-Mono-" .. variant .. ".otf")
+    local variant_exists = vim.fn.filereadable(variant_path) == 1
+    if variant_exists then
+      variants_found = variants_found + 1
+      -- Only show the first few variants to avoid too much output
+      if variants_found <= 3 then
+        table.insert(settings, "        ✓ SF-Mono-" .. variant .. ".otf")
+      end
+    end
+  end
+
+  -- Show summary if there are more variants
+  if variants_found > 3 then
+    table.insert(settings, "        ... and " .. (variants_found - 3) .. " more variant(s)")
+  elseif variants_found == 0 then
+    table.insert(settings, "        ✗ No variants found")
   end
 end
 
