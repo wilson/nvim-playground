@@ -220,51 +220,48 @@ end
 
 -- Setup color mode autocmds
 function M.setup_autocmds()
-  -- Apply color mode settings on key events
-  vim.api.nvim_create_autocmd({"VimEnter", "BufEnter", "ColorScheme"}, {
+  -- Add a special event for nvim-qt GUI detection
+  vim.api.nvim_create_autocmd("User", {
+    pattern = {"GuiLoaded", "GUIEnter"},
     callback = function()
-      -- Don't interfere if we're in the middle of an explicit mode change
-      if vim.g.explicit_mode_change then
+      -- Mark nvim-qt as detected
+      vim.g.nvim_qt_detected = true
+
+      -- Switch to GUI mode immediately for nvim-qt
+      if vim.g.basic_mode then
+        vim.schedule(function()
+          pcall(vim.cmd, "GUIMode")
+        end)
+      end
+    end,
+    desc = "Enable GUI mode for nvim-qt"
+  })
+
+  -- Standard color mode checking for other events
+  vim.api.nvim_create_autocmd("VimEnter", {
+    callback = function()
+      -- Don't run if already handled
+      if vim.g.explicit_mode_change or vim.g._init_colors_done then
         return
       end
 
-      -- Use the is_gui_environment function from utils
+      -- Check for GUI environment
       local utils = require("config.utils")
       local in_gui = utils.is_gui_environment()
 
       -- Auto-switch to GUI mode when in GUI environment
-      if in_gui and not vim.g._init_colors_done and not vim.g.force_terminal_mode then
-        -- Only for VimEnter
-        if vim.v.event.source == "VimEnter" then
-          -- Temporarily disable notifications
-          local old_notify = vim.notify
-          vim.notify = function() end
-
-          -- Apply GUI mode using the existing command
-          vim.cmd("GUIMode")
-          -- Restore notify
-          vim.notify = old_notify
-          -- Set flag
-          vim.g._init_colors_done = true
-        end
-      elseif vim.g.basic_mode then
-        -- Initial load
-        if vim.v.event.source == "VimEnter" and not vim.g._init_colors_done then
-          -- Disable notifications temporarily
-          local old_notify = vim.notify
-          vim.notify = function() end
-          pcall(M.force_reset_syntax)
-          -- Restore notify
-          vim.notify = old_notify
-          -- Set flag
-          vim.g._init_colors_done = true
-        else
-          -- Regular call for other events
-          pcall(M.force_reset_syntax)
-        end
+      if in_gui and vim.g.basic_mode then
+        -- Switch to GUI mode quietly
+        local old_notify = vim.notify
+        vim.notify = function() end
+        pcall(vim.cmd, "GUIMode")
+        vim.notify = old_notify
       end
+
+      -- Mark as initialized
+      vim.g._init_colors_done = true
     end,
-    desc = "Maintain color mode settings",
+    desc = "Auto-detect GUI environment at startup",
   })
 end
 
