@@ -18,8 +18,7 @@ function M.get_env_info()
     "Environment variables:",
   }
 
-  -- Use utils.safe_get_env for environment variables
-  local utils = require("config.utils")
+  -- Already imported utils at the top level, don't redefine
 
   -- Add critical environment variables
   table.insert(env_info, "  TERM: " .. utils.safe_get_env("TERM"))
@@ -155,35 +154,285 @@ function M.get_nvim_settings()
 
     table.insert(settings, "  GUI client: " .. gui_client .. gui_app_name)
 
-    -- Get font information with improved detection
+    -- Get font information with improved detection and detailed process display
     pcall(function()
       local font = "Unknown"
       local font_source = ""
 
-      -- Check various font sources in order of preference
+      -- Create a font section with detailed detection information
+      table.insert(settings, "")
+      table.insert(settings, "  Font Detection Details:")
+      table.insert(settings, "  " .. string.rep("═", 50))
+
+      -- Add detection process information
+      table.insert(settings, "  Detection process:")
+
+      -- Check various font sources in order of preference and document the process
       if vim.o.guifont and vim.o.guifont ~= "" then
         font = vim.o.guifont
         font_source = "guifont"
-      elseif vim.g.GuiFont and vim.g.GuiFont ~= "" then
-        font = vim.g.GuiFont
-        font_source = "GuiFont"
-      elseif vim.fn.exists("+guifont") == 1 then
-        -- Try getting via direct command
-        local ok, cmd_font = pcall(vim.api.nvim_exec2, "set guifont?", {output = true})
-        if ok and cmd_font and cmd_font.output then
-          local stripped = cmd_font.output:gsub("guifont=", ""):gsub("^%s*(.-)%s*$", "%1")
-          if stripped ~= "" then
-            font = stripped
-            font_source = "set guifont?"
+        table.insert(settings, "    ✓ Found font in vim.o.guifont: " .. font)
+      else
+        table.insert(settings, "    ✗ No font found in vim.o.guifont")
+
+        if vim.g.GuiFont and vim.g.GuiFont ~= "" then
+          font = vim.g.GuiFont
+          font_source = "GuiFont"
+          table.insert(settings, "    ✓ Found font in vim.g.GuiFont: " .. font)
+        else
+          table.insert(settings, "    ✗ No font found in vim.g.GuiFont")
+
+          if vim.fn.exists("+guifont") == 1 then
+            -- Try getting via direct command
+            local ok, cmd_font = pcall(vim.api.nvim_exec2, "set guifont?", {output = true})
+            if ok and cmd_font and cmd_font.output then
+              local stripped = cmd_font.output:gsub("guifont=", ""):gsub("^%s*(.-)%s*$", "%1")
+              if stripped ~= "" then
+                font = stripped
+                font_source = "set guifont?"
+                table.insert(settings, "    ✓ Found font using 'set guifont?': " .. font)
+              else
+                table.insert(settings, "    ✗ 'set guifont?' returned empty result")
+              end
+            else
+              table.insert(settings, "    ✗ Failed to execute 'set guifont?' command")
+            end
+          else
+            table.insert(settings, "    ✗ guifont option doesn't exist in this environment")
           end
         end
       end
 
       -- Check if we're using default Courier New (likely not deliberately set)
       local is_default = font:match("^Courier") ~= nil
+      if is_default then
+        table.insert(settings, "    ⚠ Using default Courier font (likely not deliberately set)")
+      end
 
-      -- Add font info
-      table.insert(settings, "  Font: " .. font ..
+      -- Add font availability check information with better formatting
+      table.insert(settings, "")
+      table.insert(settings, "  Font availability testing:")
+      table.insert(settings, "  " .. string.rep("─", 50))
+
+      -- Show which system font directories we're checking
+      table.insert(settings, "  System font directories checked:")
+      local font_dirs = utils.get_system_font_dirs()
+      for _, dir in ipairs(font_dirs) do
+        -- Check if directory exists
+        local dir_exists = vim.fn.isdirectory(dir) == 1
+        table.insert(settings, "    " .. (dir_exists and "✓" or "✗") .. " " .. dir)
+      end
+      table.insert(settings, "")
+
+      -- Define preferred fonts to test
+      table.insert(settings, "  Note: Using file-system based checks only (no GUI setting attempts)")
+      table.insert(settings, "  This prevents 'Unknown font' errors in nvim-qt")
+      table.insert(settings, "")
+      table.insert(settings, "  Two different detection systems are shown here:")
+      table.insert(settings, "  1. Font availability test - Shows all fonts actually present on system")
+      table.insert(settings, "  2. Pre-validated fonts - Only fonts marked safe for nvim-qt (more conservative)")
+
+      local fonts_to_test = {
+        "SF Mono",
+        "Menlo",
+        "Monaco",
+        "Consolas",
+        "DejaVu Sans Mono"
+      }
+
+      -- Test each font and document results with verbose logging enabled
+      for _, font_name in ipairs(fonts_to_test) do
+        -- Enable verbose logging to capture detailed detection steps
+        local available = utils.is_font_available(font_name, true)
+        table.insert(settings, "    " .. (available and "✓" or "✗") .. " " .. font_name .. ": " .. (available and "Available" or "Not available"))
+
+        -- Add simplified detection log information
+        if utils._font_detection_log and utils._font_detection_log[font_name] then
+          local log_entries = utils._font_detection_log[font_name]
+          if #log_entries > 0 then
+            -- Show just essential information
+            local detection_method = "Unknown"
+            local result_reason = ""
+
+            -- Find detection method
+            for _, entry in ipairs(log_entries) do
+              if entry:match("macOS SF Mono check:") and entry:match("✓") then
+                detection_method = "Found in user fonts directory"
+                break
+              elseif entry:match("Built%-in system font:") then
+                detection_method = "Built-in system font"
+                break
+              elseif entry:match("✓ Found TTF") or entry:match("✓ Found OTF") then
+                detection_method = "Found in system font directories"
+                break
+              elseif entry:match("^Using cached") then
+                detection_method = "Cached result"
+                break
+              elseif entry:match("✗ Font not found") then
+                detection_method = "File system check"
+                break
+              end
+            end
+
+            -- Set default detection method if we still have "Unknown"
+            if detection_method == "Unknown" then
+              detection_method = "File system check"
+            end
+
+            -- Find final result reason
+            for _, entry in ipairs(log_entries) do
+              if entry:match("^✗ Font not found") then
+                result_reason = "Not found in any location"
+                break
+              end
+            end
+
+            -- Add detection method
+            table.insert(settings, "      └ Detection: " .. detection_method)
+
+            -- Add reason if relevant
+            if result_reason ~= "" and not detection_method:match("cached") then
+              table.insert(settings, "      └ Reason: " .. result_reason)
+            end
+          end
+        end
+
+        -- If SF Mono and on macOS, check the file path with detailed info
+        if font_name == "SF Mono" and vim.fn.has("macunix") == 1 then
+          -- Check user font directory
+          local user_path = vim.fn.expand("~/Library/Fonts/SF-Mono-Regular.otf")
+          local user_exists = vim.fn.filereadable(user_path) == 1
+          table.insert(settings, "      └ User fonts: " .. (user_exists and "✓ Found at " or "✗ Not found at ") .. user_path)
+
+          -- Check system font directory
+          local system_path = "/Library/Fonts/SF-Mono-Regular.otf"
+          local system_exists = vim.fn.filereadable(system_path) == 1
+          table.insert(settings, "      └ System fonts: " .. (system_exists and "✓ Found at " or "✗ Not found at ") .. system_path)
+
+          -- Check Terminal.app font directory (source for installation)
+          local terminal_path = "/System/Applications/Utilities/Terminal.app/Contents/Resources/Fonts/SF-Mono-Regular.otf"
+          local terminal_exists = vim.fn.filereadable(terminal_path) == 1
+          table.insert(settings, "      └ Terminal.app: " .. (terminal_exists and "✓ Available at " or "✗ Not available at ") .. terminal_path)
+
+          -- Check all variants in user font directory
+          table.insert(settings, "      └ Font variants in ~/Library/Fonts:")
+          local variants = {"Regular", "Bold", "RegularItalic", "BoldItalic", "Medium", "MediumItalic", "Light", "LightItalic"}
+          local variants_found = 0
+
+          for _, variant in ipairs(variants) do
+            local variant_path = vim.fn.expand("~/Library/Fonts/SF-Mono-" .. variant .. ".otf")
+            local variant_exists = vim.fn.filereadable(variant_path) == 1
+            if variant_exists then
+              variants_found = variants_found + 1
+              -- Only show the first few variants to avoid too much output
+              if variants_found <= 3 then
+                table.insert(settings, "        ✓ SF-Mono-" .. variant .. ".otf")
+              end
+            end
+          end
+
+          -- Show summary if there are more variants
+          if variants_found > 3 then
+            table.insert(settings, "        ... and " .. (variants_found - 3) .. " more variant(s)")
+          elseif variants_found == 0 then
+            table.insert(settings, "        ✗ No variants found")
+          end
+        end
+      end
+
+      -- Add cache information
+      if utils._font_cache then
+        table.insert(settings, "")
+        table.insert(settings, "  Font cache status:")
+        local cache_entries = 0
+        for _ in pairs(utils._font_cache) do
+          cache_entries = cache_entries + 1
+        end
+        table.insert(settings, "    Total cached fonts: " .. cache_entries)
+      end
+
+      -- Show information about pre-validated fonts from fonts.lua
+      local fonts_module = require("config.fonts")
+      if fonts_module._validated_fonts and not vim.tbl_isempty(fonts_module._validated_fonts) then
+        table.insert(settings, "")
+        table.insert(settings, "  Pre-validated fonts (safe for nvim-qt):")
+        table.insert(settings, "  " .. string.rep("─", 40))
+        table.insert(settings, "  Note: Only fonts that actually exist on the filesystem are marked available here.")
+
+        -- Count available vs unavailable fonts
+        local available_count = 0
+        local unavailable_count = 0
+
+        -- Group by availability
+        local available_fonts = {}
+        local unavailable_fonts = {}
+
+        for font_name, is_available in pairs(fonts_module._validated_fonts) do
+          if is_available then
+            available_count = available_count + 1
+            table.insert(available_fonts, font_name)
+          else
+            unavailable_count = unavailable_count + 1
+            table.insert(unavailable_fonts, font_name)
+          end
+        end
+
+        -- Sort font lists for consistent display
+        table.sort(available_fonts)
+        table.sort(unavailable_fonts)
+
+        -- Show summary
+        table.insert(settings, "    Total pre-validated: " .. (available_count + unavailable_count))
+        table.insert(settings, "    Available: " .. available_count)
+        table.insert(settings, "    Unavailable: " .. unavailable_count)
+
+        -- Show available fonts
+        if available_count > 0 then
+          table.insert(settings, "")
+          table.insert(settings, "    Available fonts:")
+          for _, font_entry in ipairs(available_fonts) do
+            table.insert(settings, "      ✓ " .. font_entry)
+          end
+        end
+
+        -- Show unavailable fonts
+        if unavailable_count > 0 then
+          table.insert(settings, "")
+          table.insert(settings, "    Unavailable fonts:")
+          for _, font_entry in ipairs(unavailable_fonts) do
+            table.insert(settings, "      ✗ " .. font_entry)
+          end
+        end
+      else
+        table.insert(settings, "")
+        table.insert(settings, "  Pre-validated fonts: None (will be populated on GUI startup)")
+      end
+
+      -- Add visual font sample to help with debugging font rendering issues
+      table.insert(settings, "")
+      table.insert(settings, "  Font rendering test:")
+      table.insert(settings, "  " .. string.rep("━", 40))
+      table.insert(settings, "  Programming ligatures (if supported by font):")
+      table.insert(settings, "    -> => != == === := ::= |> <| <> ++ +++ -- --- <-> =/= /= <= >=")
+
+      table.insert(settings, "")
+      table.insert(settings, "  Unicode symbols (varying widths):")
+      table.insert(settings, "    Arrows: ← → ↑ ↓ ↔ ↕ ⇐ ⇒ ⇑ ⇓ ⟸ ⟹ ⟺")
+      table.insert(settings, "    Math: π ∑ ∏ √ ∛ ∫ ∮ ∇ ∂ ∆ ∞ ≈ ≥ ≤ ≡ ≠ ∈ ∉ ∋ ∅ ∧ ∨ ∩ ∪")
+      table.insert(settings, "    Misc: ✓ ✗ ✕ ⚠ ⬤ ❉ ♥ ★ © ® ™ ° ¢ € £ ¥ § †")
+
+      table.insert(settings, "")
+      table.insert(settings, "  Zero vs letter O vs number 0:")
+      table.insert(settings, "    0O1Il|!: Zero, capital O, one, capital i, lowercase L, pipe, exclamation")
+
+      table.insert(settings, "")
+      table.insert(settings, "  Character fitting:")
+      table.insert(settings, "    ████████ ▓▓▓▓▓▓▓▓ ▒▒▒▒▒▒▒▒ ░░░░░░░░")
+      table.insert(settings, "    MMMMMMMM iiiiiiii ________")
+
+      -- Add main font info section
+      table.insert(settings, "")
+      table.insert(settings, "  Current font: " .. font ..
                           (font_source ~= "" and " (from " .. font_source .. ")" or ""))
 
       -- Add a helpful note if using default font

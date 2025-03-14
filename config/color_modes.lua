@@ -189,14 +189,16 @@ function M.setup_commands()
     -- Set guifont if in a GUI environment
     local utils = require("config.utils")
     if utils.is_gui_environment() then
-      -- Pre-check SF Mono availability to avoid Qt warning
+      -- Load the fonts module
       local fonts = require("config.fonts")
 
-      -- Suppress warning message while setting fonts
-      local old_notify = vim.notify
-      vim.notify = function() end  -- Temporarily disable notifications
+      -- Pre-validate fonts to avoid "Unknown font" warnings
+      -- This checks for font files without trying to set the fonts
+      fonts.prevalidate_fonts()
+
+      -- Now set the best available font from pre-validated options
+      -- This prevents any warnings or errors from nvim-qt
       fonts.set_best_font()
-      vim.notify = old_notify      -- Restore notifications
     end
     -- Make sure the colorscheme is available by checking if the plugin path exists
     local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/little-wonder")
@@ -256,6 +258,11 @@ function M.setup_autocmds()
     callback = function()
       -- Use dedicated font handling module for fonts
       local fonts = require("config.fonts")
+
+      -- Pre-validate fonts first to avoid "Unknown font" warnings in nvim-qt
+      fonts.prevalidate_fonts()
+
+      -- Now set the best available font from pre-validated options
       fonts.set_best_font()
 
       -- Apply GUI appearance settings
