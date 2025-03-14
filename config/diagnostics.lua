@@ -104,6 +104,25 @@ function M.get_command_info()
   }
 end
 
+-- Highlight the Available Commands section
+local function highlight_commands_section(buf, lines)
+  local ns_id = vim.api.nvim_create_namespace("diagnostics_commands")
+  -- Find and highlight just the section header
+  for i = 1, #lines do
+    if lines[i] == "Available Commands:" then
+      vim.api.nvim_buf_add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
+      break
+    end
+  end
+  -- Find and highlight the Color Test header
+  for i = 1, #lines do
+    if lines[i] == "Color Test (shows colored blocks):" then
+      vim.api.nvim_buf_add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
+      break
+    end
+  end
+end
+
 -- Helper function to generate terminal diagnostics information
 function M.get_terminal_diagnostics_info()
   local info = {}
@@ -308,34 +327,33 @@ function M.add_recommendations(buf)
   local ns_id = vim.api.nvim_create_namespace("diagnostics_recommendations")
 
   if utils.is_gui_environment() then
-    -- GUI environment recommendations
+    -- GUI environment recommendations - completely rewritten to avoid GUI Mode confusion
+    -- First, add the header
     vim.api.nvim_buf_set_lines(buf, -1, -1, false, {
       "",
-      "GUI Environment Detected:",
-      "------------------------",
-      "• You are running in a GUI environment (nvim-qt, neovide, etc.)",
-      "• Make sure termguicolors is ON (use :GUIMode if needed)",
-      "• GUI mode offers better color support and visual features",
-      "• Use :GUIMode to ensure proper GUI settings"
+      "Graphical Environment Detected:",
+      "------------------------------",
     })
-
-    -- Add highlighting
+    -- Get current line count after adding header
     local line_count = vim.api.nvim_buf_line_count(buf)
-    vim.api.nvim_buf_add_highlight(buf, ns_id, "Title", line_count - 7, 0, -1)
-    vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", line_count - 6, 0, -1)
-
-    -- Highlight the bullet points
-    for i = 5, 2, -1 do
-      local line_num = line_count - i
-      -- Highlight the bullet
-      vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", line_num, 0, 1)
-      -- Highlight the command name
-      if i == 5 or i == 2 then
-        local cmd_start = line_num == line_count - 5 and 35 or 5
-        local cmd_end = line_num == line_count - 5 and 45 or 13
-        vim.api.nvim_buf_add_highlight(buf, ns_id, "Identifier", line_num, cmd_start, cmd_end)
-      end
-    end
+    -- Highlight the header
+    vim.api.nvim_buf_add_highlight(buf, ns_id, "Title", line_count - 3, 0, -1)
+    vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", line_count - 2, 0, -1)
+    -- Add and highlight each bullet point separately
+    -- Bullet point 1
+    vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"• You are running in a graphical environment (nvim-qt, neovide, etc.)"})
+    vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", line_count, 0, 1) -- Highlight bullet
+    -- Bullet point 2
+    vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"• Make sure termguicolors is ON"})
+    vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", line_count + 1, 0, 1) -- Highlight bullet
+    -- Bullet point 3
+    vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"• This mode offers better color support and visual features"})
+    vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", line_count + 2, 0, 1) -- Highlight bullet
+    -- Bullet point 4 with correct command
+    vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"• Use the :GUIMode command for proper settings"})
+    local last_line = line_count + 3
+    -- Highlight just the bullet point
+    vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", last_line, 0, 1)
   else
     -- Basic mode recommendations
     vim.api.nvim_buf_set_lines(buf, -1, -1, false, {
@@ -400,47 +418,24 @@ function M.setup()
     vim.api.nvim_buf_add_highlight(buf, ns_id, "Title", 0, 0, -1)
     vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", 1, 0, -1)
 
-    -- Highlight environment information
-    vim.api.nvim_buf_add_highlight(buf, ns_id, "Label", 3, 0, -1)
-
-    -- Highlight terminal information
-    local env_vars_start = 5
-    for i = 0, 2 do
-      -- Highlight the variable name
-      vim.api.nvim_buf_add_highlight(buf, ns_id, "Identifier", env_vars_start + i, 2, 15)
-    end
-
-    -- Find the Neovim settings section
-    local neovim_settings_idx = nil
+    -- Only highlight section headers and keep the rest plain
+    -- This avoids any offset issues with variable/setting names
+    -- Highlight just the "Environment variables:" header
     for i = 1, #lines do
-      if lines[i] == "Neovim settings:" then
-        neovim_settings_idx = i - 1
+      if lines[i] == "Environment variables:" then
+        vim.api.nvim_buf_add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
         break
       end
     end
-
-    if neovim_settings_idx then
-      -- Highlight the section header
-      vim.api.nvim_buf_add_highlight(buf, ns_id, "Label", neovim_settings_idx, 0, -1)
-
-      -- Highlight setting names
-      for i = 1, 4 do
-        -- Highlight the setting name
-        vim.api.nvim_buf_add_highlight(buf, ns_id, "Identifier", neovim_settings_idx + i, 2, 15)
-        -- Highlight values (especially Yes/No for GUI environment)
-        if i == 3 then
-          -- GUI environment status
-          local val = utils.is_gui_environment() and "Yes" or "No"
-          local start_col = lines[neovim_settings_idx + i]:find(val, 20)
-          if start_col then
-            local hl_group = val == "Yes" and "String" or "Comment"
-            local col_start = start_col - 1
-            local col_end = start_col + #val - 1
-            vim.api.nvim_buf_add_highlight(buf, ns_id, hl_group, neovim_settings_idx + i, col_start, col_end)
-          end
-        end
+    -- Highlight just the "Neovim settings:" header
+    for i = 1, #lines do
+      if lines[i] == "Neovim settings:" then
+        vim.api.nvim_buf_add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
+        break
       end
     end
+    -- Highlight the commands section headers
+    highlight_commands_section(buf, lines)
 
     -- Add color test blocks with proper highlighting
     M.add_color_test_blocks(buf)
