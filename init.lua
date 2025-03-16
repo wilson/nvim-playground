@@ -83,13 +83,13 @@ function init.setup()
   -- Load languages configuration
   local languages_config = load_language_config()
 
-  -- Debug: List available modules in the config directory
-  local debug_modules = ""
-  for _, file in ipairs(vim.fn.glob(vim.fn.stdpath("config") .. "/config/*.lua", false, true)) do
-    local module_name = vim.fn.fnamemodify(file, ":t:r")
-    debug_modules = debug_modules .. module_name .. " "
-  end
-  vim.notify("Available modules: " .. debug_modules, vim.log.levels.INFO)
+  -- We no longer need to print available modules at startup
+  -- local debug_modules = ""
+  -- for _, file in ipairs(vim.fn.glob(vim.fn.stdpath("config") .. "/config/*.lua", false, true)) do
+  --   local module_name = vim.fn.fnamemodify(file, ":t:r")
+  --   debug_modules = debug_modules .. module_name .. " "
+  -- end
+  -- vim.notify("Available modules: " .. debug_modules, vim.log.levels.INFO)
 
   -- Load and initialize plugin manager
   local plugins, err = safe_require("config.plugins")
