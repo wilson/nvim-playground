@@ -319,6 +319,18 @@ function M.setup_autocmds()
     end,
     desc = "Auto-detect GUI environment at startup",
   })
+
+  -- Enforce high contrast for visible whitespace characters (like SpaceHi)
+  vim.api.nvim_create_autocmd("ColorScheme", {
+    pattern = "*",
+    callback = function()
+      -- Use a vibrant pink/red to make spaces and tabs highly visible
+      vim.api.nvim_set_hl(0, "Whitespace", { fg = "#ff0055", bold = true })
+      vim.api.nvim_set_hl(0, "NonText", { fg = "#ff0055", bold = true })
+      vim.api.nvim_set_hl(0, "SpecialKey", { fg = "#ff0055", bold = true })
+    end,
+    desc = "Apply high contrast to whitespace characters",
+  })
 end
 
 -- Initialize terminal mode by default

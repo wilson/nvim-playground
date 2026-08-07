@@ -62,11 +62,7 @@ function M.setup(languages_config)
       end
     },
 
-    -- GitHub Copilot
-    {
-      "github/copilot.vim",
-      lazy = false, -- Load immediately to ensure it's properly recognized
-    },
+
     -- JSON/YAML Schema Store
     {
       "b0o/schemastore.nvim",

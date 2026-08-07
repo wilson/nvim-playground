@@ -49,12 +49,21 @@ function init.basic_setup()
   vim.opt.showmatch = true            -- Show matching brackets
   vim.opt.laststatus = 2              -- Always show status line
   vim.opt.list = true                 -- Show hidden characters
-  vim.opt.listchars = {tab = "▸ ", trail = "·"} -- Character representations
+  vim.opt.listchars = {tab = "▸ ", trail = "•", extends = "»", precedes = "«", nbsp = "✗"} -- Character representations
   vim.opt.hidden = true               -- Allow hidden buffers
   vim.opt.splitbelow = true           -- Split below current window
   vim.opt.splitright = true           -- Split right of current window
   vim.opt.mouse = "a"                 -- Enable mouse in all modes
   vim.opt.shortmess:append("I")       -- Disable intro message
+
+  -- Filetype specific overrides
+  vim.api.nvim_create_autocmd("FileType", {
+    pattern = "make",
+    callback = function()
+      vim.opt_local.expandtab = false
+    end,
+    desc = "Ensure hard tabs are used in Makefiles",
+  })
 end
 
 -- Setup basic color mode
