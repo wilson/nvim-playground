@@ -208,13 +208,7 @@ function M.log_font_message(msg, level)
       })
     end
   end
-
-  -- We no longer send to vim.notify to avoid duplicate notifications
-  -- All font messages are handled by our custom notification system
 end
-
--- The show_font_message_history function has been removed in favor of show_notification_history,
--- which is now called via the :FontMessages command
 
 -- Show all font notifications in a popup format (similar to Neovim's notification history)
 function M.show_notification_history()
@@ -344,125 +338,72 @@ function M.setup_commands()
         break
       end
     end
-
-    -- If no fallback message found but we're using a non-preferred font, show a notice
-    if not has_fallback and vim.o.guifont then
-      local font = vim.o.guifont
-      if font:match("Menlo") or font:match("Monaco") or font:match("Courier") then
-        M.log_font_message("Font in use: " .. font .. "\nNote: This may be a fallback font.", "warning")
-      end
-    end
   end)
 end
 
--- Pre-validate fonts by testing availability without trying to set them
-function M.prevalidate_fonts()
-  -- Clear any existing font cache in utils
-  if utils._font_cache then
-    utils._font_cache = {}
-  end
-
-  -- Log a startup message to ensure our message history is working
-  M.log_font_message("Font system initialized", "info")
-
-  -- Define standard font preferences for different platforms
-  local font_preferences = {
-    -- macOS fonts
-    macos = {
-      "SF Mono:h13",     -- Apple SF Mono (included with macOS)
-      "Menlo:h13",       -- macOS default monospace
-      "Monaco:h13",      -- Classic macOS monospace
-    },
-    -- Windows fonts
-    windows = {
-      "Consolas:h13",        -- Windows/Office monospace
-      "Cascadia Code:h13",   -- Modern Windows Terminal font
-      "Segoe UI Mono:h13",   -- Windows UI font
-    },
-    -- Cross-platform and Linux fonts
-    universal = {
-      "DejaVu Sans Mono:h13", -- Open source font
-      "Liberation Mono:h13",  -- Red Hat font
-      "Ubuntu Mono:h13",      -- Ubuntu default
-      "Courier New:h13"       -- Widely available fallback
-    }
-  }
-
-  -- Clear existing validations
-  M._validated_fonts = {}
-
-  -- Select OS-appropriate fonts to check
-  local fonts_to_check = {}
-
-  if vim.fn.has("macunix") == 1 then
-    vim.list_extend(fonts_to_check, font_preferences.macos)
-    vim.list_extend(fonts_to_check, font_preferences.universal)
-  elseif vim.fn.has("win32") == 1 or vim.fn.has("win64") == 1 then
-    vim.list_extend(fonts_to_check, font_preferences.windows)
-    vim.list_extend(fonts_to_check, font_preferences.universal)
-  else
-    -- Linux, FreeBSD, etc.
-    vim.list_extend(fonts_to_check, font_preferences.universal)
-  end
-
-  -- Pre-check all fonts without attempting to set them
-  for _, font in ipairs(fonts_to_check) do
-    local base_font = font:match("^([^:]+)")
-
-    -- Use the file-based font detection only, avoiding any attempt to set the font
-    -- This prevents the "unknown font" error messages
-    local is_available
-
-    -- Special case for macOS built-in fonts
-    if vim.fn.has("macunix") == 1 and (base_font == "Menlo" or base_font == "Monaco") then
-      is_available = true
+-- Helper function to read font preferences from JSON
+function M.read_font_config()
+  local config_path = vim.fn.stdpath("config") .. "/config/fonts.json"
+  if vim.fn.filereadable(config_path) == 1 then
+    local content = vim.fn.readfile(config_path)
+    -- Join lines in case readfile returns multiple lines
+    local ok, decoded = pcall(vim.fn.json_decode, table.concat(content, "\n"))
+    if ok and type(decoded) == "table" then
+      return decoded
     else
-      -- Only check for actual font file existence, never try to set the font
-      -- This is the safest approach to avoid "Unknown font" errors
-      is_available = utils.check_system_font_dir_for_font(base_font)
+      M.log_font_message("Failed to parse config/fonts.json", "error")
     end
-
-    -- Store validation result
-    M._validated_fonts[font] = is_available
   end
+  return nil
 end
 
--- Set the best available font using a file-system based approach
--- Note: This function only attempts to set fonts that have been pre-validated
--- via file system checks to be safe for nvim-qt (no "Unknown font" errors). This means:
--- 1. Only fonts with detected font files will be considered available
--- 2. Built-in fonts (Menlo, Monaco) are always considered available on macOS
--- 3. The system will fall back to platform-specific defaults if no available fonts are found
 -- Helper function to get platform-specific font preferences
 function M.get_preferred_fonts()
-  local preferred_fonts
+  local config = M.read_font_config()
 
-  if vim.fn.has("macunix") == 1 then
-    preferred_fonts = {
-      "SF Mono:h13",   -- Apple SF Mono
-      "Menlo:h13",     -- macOS default monospace
-      "Monaco:h13"     -- Classic macOS monospace
-    }
-    -- On macOS, Menlo is always available and is a better fallback
-    table.insert(preferred_fonts, "Menlo:h13")
-  elseif vim.fn.has("win32") == 1 or vim.fn.has("win64") == 1 then
-    preferred_fonts = {
-      "Consolas:h13",      -- Windows/Office monospace
-      "Cascadia Code:h13", -- Modern Windows Terminal font
-      "Segoe UI Mono:h13", -- Windows UI font
-      "Courier New:h13"    -- Safe fallback
-    }
-  else
-    -- Linux, FreeBSD, etc.
-    preferred_fonts = {
-      "DejaVu Sans Mono:h13", -- Common Linux font
-      "Liberation Mono:h13",  -- Red Hat font
-      "Ubuntu Mono:h13",      -- Ubuntu default
-      "Courier New:h13"       -- Safe fallback
-    }
+  if not config then
+    return {}
   end
 
-  return preferred_fonts
+  local default_size = config.default_size or "h14"
+  local platform_fonts = {}
+
+  if vim.fn.has("macunix") == 1 then
+    platform_fonts = config.macos or {}
+  elseif vim.fn.has("win32") == 1 or vim.fn.has("win64") == 1 then
+    platform_fonts = config.windows or {}
+  else
+    platform_fonts = config.universal or {}
+  end
+
+  local preferred_fonts = {}
+
+  for _, font in ipairs(platform_fonts) do
+    if not font:match(":[hH]%d+$") then
+      font = font .. ":" .. default_size
+    end
+    table.insert(preferred_fonts, font)
+  end
+
+  if config.universal then
+    for _, uni_font in ipairs(config.universal) do
+      if not uni_font:match(":[hH]%d+$") then
+        uni_font = uni_font .. ":" .. default_size
+      end
+      local found = false
+      for _, pref_font in ipairs(preferred_fonts) do
+        if pref_font == uni_font then
+          found = true
+          break
+        end
+      end
+      if not found then
+        table.insert(preferred_fonts, uni_font)
+      end
+    end
+  end
+
+  return preferred_fonts, default_size
 end
 
 -- Helper to apply a font setting
@@ -522,18 +463,33 @@ end
 -- 2. Built-in fonts (Menlo, Monaco) are always considered available on macOS
 -- 3. The system will fall back to platform-specific defaults if no available fonts are found
 function M.set_best_font()
-  -- Ensure fonts are pre-validated
-  if vim.tbl_isempty(M._validated_fonts) then
-    M.prevalidate_fonts()
+  -- Get platform-specific font preferences
+  local preferred_fonts, default_size = M.get_preferred_fonts()
+
+  -- If no config could be loaded, bypass selection
+  if not preferred_fonts or #preferred_fonts == 0 then
+    M.log_font_message("No fonts configured in fonts.json or file missing, bypassing automatic font selection.", "warning")
+    return nil
   end
 
-  -- Get platform-specific font preferences
-  local preferred_fonts = M.get_preferred_fonts()
+  -- Clear existing validations
+  M._validated_fonts = {}
 
   -- Try each font in order of preference
   for i, font in ipairs(preferred_fonts) do
-    -- Only try fonts that were pre-validated
-    if M._validated_fonts[font] then
+    local base_font = font:match("^([^:]+)")
+    local is_available
+
+    -- Special case for macOS built-in fonts
+    if vim.fn.has("macunix") == 1 and (base_font == "Menlo" or base_font == "Monaco") then
+      is_available = true
+    else
+      is_available = utils.check_system_font_dir_for_font(base_font)
+    end
+
+    M._validated_fonts[font] = is_available
+
+    if is_available then
       -- Apply the font settings
       M.apply_font(font)
 
@@ -557,7 +513,8 @@ function M.set_best_font()
   end
 
   -- If all preferred fonts failed, use a platform-specific fallback
-  local fallback = vim.fn.has("macunix") == 1 and "Menlo:h13" or "Courier New:h13"
+  local fallback = vim.fn.has("macunix") == 1 and "Menlo:" or "Courier New:"
+  fallback = fallback .. (default_size or "h14")
 
   -- Apply fallback font
   M.apply_font(fallback)

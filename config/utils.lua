@@ -179,47 +179,49 @@ function M.is_font_available(font_name, verbose)
   return M.log_font_result(font_base, false, verbose)
 end
 
+-- Helper function to generate variants of a font name (with dashes, no spaces, etc.)
+function M.get_font_base_variations(font_base)
+  local font_no_spaces = font_base:gsub("%s+", "")
+  local font_dash = font_base:gsub("%s+", "-")
+  local bases = { font_base, font_no_spaces, font_dash }
+
+  local prefix, suffix = font_base:match("^(.-)%s+(%S+)$")
+  if prefix and suffix then
+    table.insert(bases, prefix:gsub("%s+", "") .. "-" .. suffix)
+  end
+  return bases
+end
+
 -- Helper function to check if a font exists in system font directories
 function M.check_system_font_dir_for_font(font_base)
-  -- Special case for SF Mono on macOS
-  if font_base == "SF Mono" and vim.fn.has("macunix") == 1 then
-    -- Mac users typically install SF Mono with this naming pattern from Terminal.app
-    local sf_mono_path = vim.fn.expand("~/Library/Fonts/SF-Mono-Regular.otf")
-    if vim.fn.filereadable(sf_mono_path) == 1 then
-      return true
-    end
-  end
-
   -- Get the standard font paths for the current OS
   local font_paths = M.get_system_font_dirs()
   local variants = M.get_common_font_variants()
+
+  local bases = M.get_font_base_variations(font_base)
 
   -- Check if the font exists in any of the system font directories
   for _, path in ipairs(font_paths) do
     -- Check with variants
     for _, variant in ipairs(variants) do
-      local ttf_path = path .. font_base .. "-" .. variant .. ".ttf"
-      local otf_path = path .. font_base .. "-" .. variant .. ".otf"
+      for _, base in ipairs(bases) do
+        local ttf_path = path .. base .. "-" .. variant .. ".ttf"
+        local otf_path = path .. base .. "-" .. variant .. ".otf"
 
-      if vim.fn.filereadable(ttf_path) == 1 or vim.fn.filereadable(otf_path) == 1 then
-        return true
-      end
-
-      -- Special case for SF Mono which uses a different naming convention
-      if font_base == "SF Mono" then
-        local sf_path = path .. "SF-Mono-" .. variant .. ".otf"
-        if vim.fn.filereadable(sf_path) == 1 then
+        if vim.fn.filereadable(ttf_path) == 1 or vim.fn.filereadable(otf_path) == 1 then
           return true
         end
       end
     end
 
     -- Check without variants (e.g., Arial.ttf rather than Arial-Regular.ttf)
-    local ttf_path = path .. font_base .. ".ttf"
-    local otf_path = path .. font_base .. ".otf"
+    for _, base in ipairs(bases) do
+      local ttf_path = path .. base .. ".ttf"
+      local otf_path = path .. base .. ".otf"
 
-    if vim.fn.filereadable(ttf_path) == 1 or vim.fn.filereadable(otf_path) == 1 then
-      return true
+      if vim.fn.filereadable(ttf_path) == 1 or vim.fn.filereadable(otf_path) == 1 then
+        return true
+      end
     end
   end
 
@@ -261,7 +263,8 @@ end
 function M.get_common_font_variants()
   return {
     "Regular", "Bold", "Italic", "BoldItalic", "Medium", "Light",
-    "MediumItalic", "LightItalic", "Thin", "ThinItalic", "Heavy", "HeavyItalic"
+    "MediumItalic", "LightItalic", "Thin", "ThinItalic", "Heavy", "HeavyItalic",
+    "Text", "TextItalic", "SemiBold", "SemiBoldItalic"
   }
 end
 
@@ -288,32 +291,38 @@ end
 
 -- Check for font variants in a specific directory
 function M.check_font_variants_in_dir(base_path, font_base, variants, verbose)
+  local bases = M.get_font_base_variations(font_base)
+
   -- Check variant fonts (e.g., Font-Regular.ttf)
   for _, variant in ipairs(variants) do
-    local ttf_path = base_path .. font_base .. "-" .. variant .. ".ttf"
-    local otf_path = base_path .. font_base .. "-" .. variant .. ".otf"
+    for _, base in ipairs(bases) do
+      local ttf_path = base_path .. base .. "-" .. variant .. ".ttf"
+      local otf_path = base_path .. base .. "-" .. variant .. ".otf"
 
-    if M.check_font_file(ttf_path, font_base, verbose, true, variant) or
-       M.check_font_file(otf_path, font_base, verbose, true, variant) then
+      if M.check_font_file(ttf_path, font_base, verbose, true, variant) or
+         M.check_font_file(otf_path, font_base, verbose, true, variant) then
 
-      if verbose then
-        table.insert(M._font_detection_log[font_base], "  ✓ Font found, marking as available")
+        if verbose then
+          table.insert(M._font_detection_log[font_base], "  ✓ Font found, marking as available")
+        end
+
+        M._font_cache[font_base] = true
+        return true
       end
-
-      M._font_cache[font_base] = true
-      return true
     end
   end
 
   -- Check base font with no variant (e.g., Font.ttf)
-  local ttf_path = base_path .. font_base .. ".ttf"
-  local otf_path = base_path .. font_base .. ".otf"
+  for _, base in ipairs(bases) do
+    local ttf_path = base_path .. base .. ".ttf"
+    local otf_path = base_path .. base .. ".otf"
 
-  if M.check_font_file(ttf_path, font_base, verbose, false) or
-     M.check_font_file(otf_path, font_base, verbose, false) then
+    if M.check_font_file(ttf_path, font_base, verbose, false) or
+       M.check_font_file(otf_path, font_base, verbose, false) then
 
-    M._font_cache[font_base] = true
-    return true
+      M._font_cache[font_base] = true
+      return true
+    end
   end
 
   return false

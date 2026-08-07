@@ -192,11 +192,7 @@ function M.setup_commands()
       -- Load the fonts module
       local fonts = require("config.fonts")
 
-      -- Pre-validate fonts to avoid "Unknown font" warnings
-      -- This checks for font files without trying to set the fonts
-      fonts.prevalidate_fonts()
-
-      -- Now set the best available font from pre-validated options
+      -- Now set the best available font from configuration
       -- This prevents any warnings or errors from nvim-qt
       fonts.set_best_font()
     end
@@ -259,10 +255,7 @@ function M.setup_autocmds()
       -- Use dedicated font handling module for fonts
       local fonts = require("config.fonts")
 
-      -- Pre-validate fonts first to avoid "Unknown font" warnings in nvim-qt
-      fonts.prevalidate_fonts()
-
-      -- Now set the best available font from pre-validated options
+      -- Set the best available font from configuration
       fonts.set_best_font()
 
       -- Apply GUI appearance settings
