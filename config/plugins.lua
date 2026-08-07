@@ -66,6 +66,8 @@ function M.setup(languages_config)
           vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, opts)
           vim.keymap.set('n', 'gr', vim.lsp.buf.references, opts)
           vim.keymap.set('n', '<leader>f', function() vim.lsp.buf.format { async = true } end, opts)
+          vim.keymap.set('n', '<leader>w', vim.diagnostic.open_float, opts)
+          vim.keymap.set('n', '<leader>W', vim.diagnostic.setloclist, opts)
         end
         -- LSP capabilities (with cmp integration if available)
         local capabilities = vim.lsp.protocol.make_client_capabilities()
