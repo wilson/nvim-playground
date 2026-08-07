@@ -83,14 +83,6 @@ function init.setup()
   -- Load languages configuration
   local languages_config = load_language_config()
 
-  -- We no longer need to print available modules at startup
-  -- local debug_modules = ""
-  -- for _, file in ipairs(vim.fn.glob(vim.fn.stdpath("config") .. "/config/*.lua", false, true)) do
-  --   local module_name = vim.fn.fnamemodify(file, ":t:r")
-  --   debug_modules = debug_modules .. module_name .. " "
-  -- end
-  -- vim.notify("Available modules: " .. debug_modules, vim.log.levels.INFO)
-
   -- Load and initialize plugin manager
   local plugins, err = safe_require("config.plugins")
   if plugins then
@@ -115,6 +107,10 @@ function init.setup()
   else
     vim.notify("Failed to load diagnostics module: " .. tostring(diag_err), vim.log.levels.ERROR)
   end
+
+  -- Set up global diagnostic keymaps
+  vim.keymap.set('n', '<leader>w', vim.diagnostic.open_float, { noremap = true, silent = true, desc = "Show diagnostics float" })
+  vim.keymap.set('n', '<leader>W', vim.diagnostic.setloclist, { noremap = true, silent = true, desc = "Show diagnostics list" })
 
   -- Key repeat fix is now handled by DYLD injection in ~/.config/nvim/qt-keyrepeat-fix
 end
