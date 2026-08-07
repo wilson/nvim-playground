@@ -34,6 +34,11 @@ function M.is_gui_environment()
   return false
 end
 
+-- Function to check if running specifically in Apple's built-in Terminal.app
+function M.is_apple_terminal()
+  return vim.env.TERM_PROGRAM == 'Apple_Terminal'
+end
+
 -- Helper function to safely load modules
 function M.require_safe(module_name)
   local ok, module = pcall(require, module_name)

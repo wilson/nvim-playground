@@ -71,9 +71,6 @@ M.server_settings = {
           globals = { "vim" },  -- Recognize vim global
         },
         workspace = {
-          -- Make server aware of Neovim runtime files
-          -- Use empty table when running outside of Neovim
-          library = vim.api.nvim_get_runtime_file("", true),
           checkThirdParty = false,
         },
         telemetry = {

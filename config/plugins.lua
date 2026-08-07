@@ -9,26 +9,57 @@ local M = {}
 function M.setup(languages_config)
   -- Define plugin specs
   local plugins = {
-    -- Color scheme
+    -- Color schemes
     {
-      "VonHeikemen/little-wonder",
+      "bluz71/vim-moonfly-colors",
       lazy = false,
       priority = 1000, -- Load before other plugins
       config = function()
+        -- Disable all italics
+        vim.g.moonflyItalics = false
+
         -- Only set colorscheme in GUI mode (not Basic mode)
         if not vim.g.basic_mode then
           vim.opt.termguicolors = true
-          -- Make sure the colorscheme is available by checking if the plugin path exists
-          local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/little-wonder")
-          if vim.fn.isdirectory(plugin_path) ~= 0 then
-            pcall(vim.cmd, "colorscheme lw-rubber")
-          else
-            vim.notify("little-wonder plugin not found. Colorscheme not applied.", vim.log.levels.WARN)
-          end
+          pcall(vim.cmd, "colorscheme moonfly")
           -- Force apply GUI mode settings
           vim.api.nvim_exec_autocmds("User", { pattern = "GUIModeApplied" })
         end
       end,
+    },
+    {
+      "EdenEast/nightfox.nvim",
+      lazy = true,
+      config = function()
+        require("nightfox").setup({
+          options = {
+            styles = {
+              comments = "NONE",
+              keywords = "NONE",
+              functions = "NONE",
+              strings = "NONE",
+              variables = "NONE",
+            }
+          }
+        })
+      end
+    },
+    {
+      "projekt0n/github-nvim-theme",
+      lazy = true,
+      config = function()
+        require("github-theme").setup({
+          options = {
+            styles = {
+              comments = "NONE",
+              keywords = "NONE",
+              functions = "NONE",
+              strings = "NONE",
+              variables = "NONE",
+            }
+          }
+        })
+      end
     },
 
     -- GitHub Copilot

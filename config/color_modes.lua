@@ -207,11 +207,11 @@ function M.setup_commands()
       fonts.set_best_font()
     end
     -- Make sure the colorscheme is available by checking if the plugin path exists
-    local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/little-wonder")
+    local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/vim-moonfly-colors")
     if vim.fn.isdirectory(plugin_path) ~= 0 then
-      pcall(vim.cmd, "colorscheme lw-rubber")
+      pcall(vim.cmd, "colorscheme moonfly")
     else
-      vim.notify("little-wonder plugin not found. Colorscheme not applied.", vim.log.levels.WARN)
+      vim.notify("moonfly plugin not found. Colorscheme not applied.", vim.log.levels.WARN)
     end
 
     -- Enable treesitter highlighting
@@ -300,12 +300,13 @@ function M.setup_autocmds()
         return
       end
 
-      -- Check for GUI environment
+      -- Check for GUI environment or legacy terminal
       local utils = require("config.utils")
       local in_gui = utils.is_gui_environment()
+      local is_apple = utils.is_apple_terminal()
 
-      -- Auto-switch to GUI mode when in GUI environment
-      if in_gui and vim.g.basic_mode then
+      -- Auto-switch to GUI mode when in GUI environment OR a non-Apple terminal
+      if (in_gui or not is_apple) and vim.g.basic_mode then
         -- Switch to GUI mode quietly
         local old_notify = vim.notify
         vim.notify = function() end
@@ -329,10 +330,10 @@ function M.init()
   -- Create a global variable to track which mode we're in
   vim.g.basic_mode = true
 
-  -- Apply the lw-rubber colorscheme for BasicMode if available
-  local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/little-wonder")
+  -- Apply the moonfly colorscheme for BasicMode if available
+  local plugin_path = vim.fn.expand("~/.local/share/nvim/lazy/vim-moonfly-colors")
   if vim.fn.isdirectory(plugin_path) ~= 0 then
-    pcall(vim.cmd, "colorscheme lw-rubber")
+    pcall(vim.cmd, "colorscheme moonfly")
   end
 
   -- Apply basic mode syntax explicitly to ensure it's active by default
