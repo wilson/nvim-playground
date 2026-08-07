@@ -20,3 +20,7 @@ Thumbs.db
 
 # Don't ignore lazy-lock.json as it should be tracked
 # lazy-lock.json
+
+# LLM slop
+AGENTS.md
+CLAUDE.md
