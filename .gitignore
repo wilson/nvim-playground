@@ -1,4 +1,3 @@
-.aider*
 # Neovim
 .netrwhist
 **/spell/
@@ -9,11 +8,6 @@ luac.out
 # Logs
 *.log
 
-# Temporary files
-*~
-*.swp
-*.swo
-
 # OS specific files
 .DS_Store
 Thumbs.db
@@ -21,6 +15,5 @@ Thumbs.db
 # Don't ignore lazy-lock.json as it should be tracked
 # lazy-lock.json
 
-# LLM slop
-AGENTS.md
-CLAUDE.md
+# LLM bootstrap historical record
+OBSOLETE_AGENT_CONTEXT.md
