@@ -34,12 +34,12 @@ function init.setup()
   init.setup_vim_options()
 
   -- Configuration (alphabetized, no load order dependencies permitted)
-  require_and_setup("custom.autocmds")
-  require_and_setup("custom.colors")
-  require_and_setup("custom.commands")
-  require_and_setup("custom.diagnostics")
-  require_and_setup("custom.keymaps")
-  require_and_setup("custom.packages")
+  _G.require_and_setup("custom.autocmds")
+  _G.require_and_setup("custom.colors")
+  _G.require_and_setup("custom.commands")
+  _G.require_and_setup("custom.diagnostics")
+  _G.require_and_setup("custom.keymaps")
+  _G.require_and_setup("custom.packages")
 end
 
 function init.setup_vim_options()

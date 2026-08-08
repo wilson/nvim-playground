@@ -414,7 +414,7 @@ function M.run_analysis()
 
   -- Create placeholder for other mode results
   local other_mode = starting_mode and "GUIMode" or "TerminalMode"
-  local other_results = {}
+  local other_results
 
   -- Switch modes
   if vim.g.terminal_mode then

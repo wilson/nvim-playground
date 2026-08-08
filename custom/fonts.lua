@@ -320,17 +320,7 @@ function M.setup_commands()
     M.log_font_message("Font message logging system active. Run :FontMessages to view the log at any time.", "info")
   end)
 
-  -- Special handling to ensure fallback messages are visible
-  -- Check if font info has already been logged
-  vim.schedule(function()
-    local has_fallback = false
-    for _, entry in ipairs(M._font_message_history) do
-      if entry.message:match("Using fallback font") then
-        has_fallback = true
-        break
-      end
-    end
-  end)
+
 end
 
 -- Helper function to read font preferences from JSON
@@ -358,7 +348,7 @@ function M.get_preferred_fonts()
   end
 
   local default_size = config.default_size or "h14"
-  local platform_fonts = {}
+  local platform_fonts
 
   if vim.fn.has("macunix") == 1 then
     platform_fonts = config.macos or {}
@@ -370,30 +360,22 @@ function M.get_preferred_fonts()
 
   local preferred_fonts = {}
 
-  for _, font in ipairs(platform_fonts) do
-    if not font:match(":[hH]%d+$") then
-      font = font .. ":" .. default_size
-    end
-    table.insert(preferred_fonts, font)
-  end
-
-  if config.universal then
-    for _, uni_font in ipairs(config.universal) do
-      if not uni_font:match(":[hH]%d+$") then
-        uni_font = uni_font .. ":" .. default_size
+  local function append_fonts(target, source)
+    if not source then return end
+    for _, font in ipairs(source) do
+      if not font:match(":[hH]%d+$") then
+        font = font .. ":" .. default_size
       end
       local found = false
-      for _, pref_font in ipairs(preferred_fonts) do
-        if pref_font == uni_font then
-          found = true
-          break
-        end
+      for _, existing in ipairs(target) do
+        if existing == font then found = true; break end
       end
-      if not found then
-        table.insert(preferred_fonts, uni_font)
-      end
+      if not found then table.insert(target, font) end
     end
   end
+
+  append_fonts(preferred_fonts, platform_fonts)
+  append_fonts(preferred_fonts, config.universal)
 
   return preferred_fonts, default_size
 end

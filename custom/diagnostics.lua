@@ -38,16 +38,10 @@ end
 -- Helper function to get Neovim settings for diagnostics
 function M.get_nvim_settings()
   -- Safely check for GUI environment
-  local gui_status = "No"
-  do
-    gui_status = utils.is_gui_environment() and "Yes" or "No"
-  end
+  local gui_status = utils.is_gui_environment() and "Yes" or "No"
 
   -- Safely get termguicolors setting
-  local termguicolors = "Unknown"
-  do
-    termguicolors = tostring(vim.opt.termguicolors:get())
-  end
+  local termguicolors = tostring(vim.opt.termguicolors:get())
 
   -- Safely get version info with multiple methods
   local version = "Unknown"
@@ -497,10 +491,7 @@ function M.get_treesitter_info()
   table.insert(ts_status, "  Parsers installed: " .. #installed)
 
   -- Safely check highlighting status
-  local highlight_status = "Unknown"
-  do
-    highlight_status = tostring(not vim.g.terminal_mode)
-  end
+  local highlight_status = tostring(not vim.g.terminal_mode)
   table.insert(ts_status, "  Highlighting enabled: " .. highlight_status)
 
   -- Just show a summary of parsers instead of listing them all
