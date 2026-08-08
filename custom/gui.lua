@@ -1,7 +1,7 @@
 local M = {}
 
 function M.apply_gui_mode(theme)
-  vim.g.basic_mode = false
+  vim.g.terminal_mode = false
   vim.opt.termguicolors = true
 
   local utils = require("custom.utils")
@@ -37,7 +37,7 @@ function M.setup()
   vim.api.nvim_create_autocmd("User", {
     pattern = {"GuiLoaded", "GUIEnter"},
     callback = function()
-      if vim.g.basic_mode then
+      if vim.g.terminal_mode then
         vim.schedule(function()
           pcall(vim.cmd, "GUIMode")
         end)

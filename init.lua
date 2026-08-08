@@ -1,17 +1,15 @@
 -----------------------------------------------------------
--- Module: Init
--- Handles Neovim startup, configures lazy.nvim
+-- Neovim startup procedure.
 -----------------------------------------------------------
-
 local init = {}
 
 -- Add the current (a.k.a. NeoVim config) dir to the Lua package path.
 local config_dir = vim.fn.stdpath("config")
 package.path = config_dir .. "/?.lua;" .. package.path
 
--- Helper function to safely require a module and optionally run a setup function on it
+-- Safely require a module and optionally run a setup function on it.
+-- Pass false as the second argument to disable the default "setup()" call.
 _G.require_and_setup = function(module_name, setup_func_name, ...)
-  -- Default to "setup", but allow explicit false to disable calling any setup hook
   if setup_func_name == nil then
     setup_func_name = "setup"
   elseif setup_func_name == false then
@@ -32,7 +30,19 @@ _G.require_and_setup = function(module_name, setup_func_name, ...)
   return result
 end
 
-function init.core_option_setup()
+function init.setup()
+  init.setup_vim_options()
+
+  -- Configuration (alphabetized, no load order dependencies permitted)
+  require_and_setup("custom.autocmds")
+  require_and_setup("custom.colors")
+  require_and_setup("custom.commands")
+  require_and_setup("custom.diagnostics")
+  require_and_setup("custom.keymaps")
+  require_and_setup("custom.packages")
+end
+
+function init.setup_vim_options()
   vim.g.mapleader = "\\"
   vim.g.maplocalleader = "\\"
 
@@ -53,25 +63,16 @@ function init.core_option_setup()
   vim.opt.showmatch = true            -- Show matching brackets
   vim.opt.laststatus = 2              -- Always show status line
   vim.opt.list = true                 -- Show hidden characters
-  vim.opt.listchars = {tab = "▸ ", trail = "•", extends = "»", precedes = "«", nbsp = "✗"} -- Character representations
   vim.opt.hidden = true               -- Allow hidden buffers
   vim.opt.splitbelow = true           -- Split below current window
   vim.opt.splitright = true           -- Split right of current window
   vim.opt.mouse = "a"                 -- Enable mouse in all modes
   vim.opt.shortmess:append("I")       -- Disable intro message
-end
-
--- Full setup process.
-function init.setup()
-  init.core_option_setup()
-
-  -- Configuration (alphabetized)
-  require_and_setup("custom.autocmds")
-  require_and_setup("custom.colors")
-  require_and_setup("custom.commands")
-  require_and_setup("custom.diagnostics")
-  require_and_setup("custom.keymaps")
-  require_and_setup("custom.packages")
+  vim.opt.listchars = {tab = "▸ ",    -- Character representations
+                       trail = "•",
+                       extends = "»",
+                       precedes = "«",
+                       nbsp = "✗"}
 end
 
 -- Make it so

@@ -398,28 +398,28 @@ end
 -- Main function to run color analysis
 function M.run_analysis()
   -- Get current mode state
-  local current_mode = vim.g.basic_mode and "BasicMode" or "GUIMode"
+  local current_mode = vim.g.terminal_mode and "TerminalMode" or "GUIMode"
   local current_colorscheme = vim.g.colors_name or "default"
 
   -- Store the current state to restore after analysis
-  local starting_mode = vim.g.basic_mode
+  local starting_mode = vim.g.terminal_mode
 
   -- First, capture current state
   local current_results = M.capture_current_highlights()
 
   -- Create placeholder for other mode results
-  local other_mode = starting_mode and "GUIMode" or "BasicMode"
+  local other_mode = starting_mode and "GUIMode" or "TerminalMode"
   local other_results = {}
 
   -- Safely try to switch modes and capture other state
   local switch_ok, _ = pcall(function()
     -- Switch modes
-    if vim.g.basic_mode then
-      -- Currently in BasicMode, switch to GUIMode
+    if vim.g.terminal_mode then
+      -- Currently in TerminalMode, switch to GUIMode
       vim.cmd("GUIMode")
     else
-      -- Currently in GUIMode, switch to BasicMode
-      vim.cmd("BasicMode")
+      -- Currently in GUIMode, switch to TerminalMode
+      vim.cmd("TerminalMode")
     end
 
     -- Wait for highlighting to apply

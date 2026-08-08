@@ -1,17 +1,21 @@
-local M = {}
+-----------------------------------------------------------
+-- Color scheme configuration
+-----------------------------------------------------------
+local M = {
+  default_theme = "moonfly"
+}
 
--- Easily switch your preferred theme here
-M.default_theme = "moonfly"
-
-function M.enable_basic_mode(is_explicit)
+function M.enable_terminal_mode(is_explicit)
   if is_explicit then vim.g.explicit_mode_change = true end
 
-  local terminal = require("custom.terminal")
-  terminal.apply_basic_mode(M.default_theme)
+  local terminal = _G.require_and_setup("custom.terminal", false)
+  if terminal then
+    terminal.apply_terminal_mode(M.default_theme)
+  end
 
   if is_explicit then
     if vim.v.vim_did_enter == 1 then
-      vim.notify("Basic color mode applied", vim.log.levels.INFO)
+      vim.notify("Terminal color mode applied", vim.log.levels.INFO)
     end
     vim.g.explicit_mode_change = nil
   end
@@ -20,8 +24,10 @@ end
 function M.enable_gui_mode(is_explicit)
   if is_explicit then vim.g.explicit_mode_change = true end
 
-  local gui = require("custom.gui")
-  gui.apply_gui_mode(M.default_theme)
+  local gui = _G.require_and_setup("custom.gui", false)
+  if gui then
+    gui.apply_gui_mode(M.default_theme)
+  end
 
   if is_explicit then
     if vim.v.vim_did_enter == 1 then
@@ -32,63 +38,41 @@ function M.enable_gui_mode(is_explicit)
 end
 
 function M.setup()
-  -- Initialize defaults
   vim.opt.termguicolors = false
   vim.opt.background = "dark"
-  vim.g.basic_mode = true
-
-  -- Explicitly apply the basic mode syntax to ensure it's active
-  local terminal = require("custom.terminal")
-  pcall(function() terminal.apply_basic_mode() end)
-
-  -- Enforce high contrast for visible whitespace characters
-  vim.api.nvim_create_autocmd("ColorScheme", {
-    pattern = "*",
-    callback = function()
-      vim.api.nvim_set_hl(0, "Whitespace", { fg = "#ff0055", bold = true })
-      vim.api.nvim_set_hl(0, "NonText", { fg = "#ff0055", bold = true })
-      vim.api.nvim_set_hl(0, "SpecialKey", { fg = "#ff0055", bold = true })
-    end,
-    desc = "Apply high contrast to whitespace characters",
-  })
 
   -- Setup Commands
-  vim.api.nvim_create_user_command("BasicMode", function()
-    M.enable_basic_mode(true)
+  vim.api.nvim_create_user_command("TerminalMode", function()
+    M.enable_terminal_mode(true)
   end, {})
 
   vim.api.nvim_create_user_command("GUIMode", function()
     M.enable_gui_mode(true)
   end, {})
 
-  -- Auto-detect GUI environment at startup
-  vim.api.nvim_create_autocmd("VimEnter", {
+  -- Auto-detect UI environment at startup
+  vim.api.nvim_create_autocmd("UIEnter", {
     callback = function()
       if vim.g.explicit_mode_change or vim.g._init_colors_done then return end
 
-      local utils = require("custom.utils")
+      local utils = _G.require_and_setup("custom.utils", false)
+      if not utils then return end
+
       local in_gui = utils.is_gui_environment()
       local is_apple = utils.is_apple_terminal()
 
-      if (in_gui or not is_apple) and vim.g.basic_mode then
-        local old_notify = vim.notify
-        vim.notify = function() end
+      if in_gui or not is_apple then
         pcall(function() M.enable_gui_mode(false) end)
-        vim.notify = old_notify
       else
-        -- If staying in Basic mode, ensure the theme is applied now that plugins are loaded
-        if vim.g.basic_mode then
-          local terminal = require("custom.terminal")
-          pcall(function() terminal.apply_basic_mode(M.default_theme) end)
-        end
+        pcall(function() M.enable_terminal_mode(false) end)
       end
       vim.g._init_colors_done = true
     end,
-    desc = "Auto-detect GUI environment at startup",
+    desc = "Auto-detect UI environment at startup",
   })
 
   -- Load GUI specific events (for legacy GUI wrappers that load late)
-  require("custom.gui").setup()
+  _G.require_and_setup("custom.gui")
 end
 
 return M

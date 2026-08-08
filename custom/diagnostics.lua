@@ -85,7 +85,7 @@ function M.get_nvim_settings()
     "Neovim settings:",
     "  termguicolors: " .. termguicolors,
     "  GUI environment: " .. gui_status,
-    "  Basic mode: " .. tostring(vim.g.basic_mode or "Not set"),
+    "  Terminal mode: " .. tostring(vim.g.terminal_mode or "Not set"),
     "  Vim version: " .. version,
   }
 
@@ -515,7 +515,7 @@ function M.get_treesitter_info()
   -- Safely check highlighting status
   local highlight_status = "Unknown"
   pcall(function()
-    highlight_status = tostring(not vim.g.basic_mode)
+    highlight_status = tostring(not vim.g.terminal_mode)
   end)
   table.insert(ts_status, "  Highlighting enabled: " .. highlight_status)
 

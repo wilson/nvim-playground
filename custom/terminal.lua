@@ -141,20 +141,20 @@ function M.apply_256_fallback_syntax()
   ]])
 end
 
-function M.apply_basic_mode(theme)
+function M.apply_terminal_mode(theme)
   local utils = require("custom.utils")
   if utils.is_headless() then
     return
   end
 
-  local was_gui_mode = not vim.g.basic_mode
+  local was_gui_mode = not vim.g.terminal_mode
 
   if vim.fn.exists(":TSBufDisable") == 2 then
     pcall(vim.cmd, "TSBufDisable highlight")
   end
 
   vim.opt.termguicolors = false
-  vim.g.basic_mode = true
+  vim.g.terminal_mode = true
   vim.opt.background = "dark"
 
   if theme then
