@@ -54,7 +54,9 @@ M.treesitter_parsers = {
   -- Vim/Neovim specific formats
   "vim", "vimdoc", "query",
   -- Core languages
-  "c", "bash"
+  "c", "bash",
+  -- Git formats
+  "gitcommit", "git_rebase", "gitattributes", "gitignore", "diff"
 }
 
 -- Server-specific configurations for LSP

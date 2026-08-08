@@ -7,15 +7,7 @@ local M = {}
 
 -- Function to check if running in a GUI environment
 function M.is_gui_environment()
-  -- Focused primarily on nvim-qt detection based on diagnostics results
-
-  -- Check for nvim-qt's nvim_qt_detected marker (set in our autocmds)
-  -- This appears to be the most reliable indicator
-  if vim.g.nvim_qt_detected then
-    return true
-  end
-
-  -- Check for nvim-qt's GuiLoaded global
+  -- Check for legacy nvim-qt's GuiLoaded global
   if vim.g.GuiLoaded then
     return true
   end
@@ -34,15 +26,7 @@ function M.is_apple_terminal()
   return vim.env.TERM_PROGRAM == 'Apple_Terminal'
 end
 
--- Helper function to safely load modules
-function M.require_safe(module_name)
-  local ok, module = pcall(require, module_name)
-  if not ok then
-    vim.notify("Failed to load module: " .. module_name, vim.log.levels.WARN)
-    return nil
-  end
-  return module
-end
+
 
 -- Create a read-only buffer with the given content
 function M.create_ro_buffer(lines, filetype)

@@ -6,7 +6,7 @@
 local M = {}
 
 -- Configure Lazy.nvim and set up plugins
-function M.setup(languages_config)
+function M.build_specs(languages_config)
   -- Define plugin specs
   local plugins = {
     -- Color schemes
@@ -17,14 +17,6 @@ function M.setup(languages_config)
       config = function()
         -- Disable all italics
         vim.g.moonflyItalics = false
-
-        -- Only set colorscheme in GUI mode (not Basic mode)
-        if not vim.g.basic_mode then
-          vim.opt.termguicolors = true
-          pcall(vim.cmd, "colorscheme moonfly")
-          -- Force apply GUI mode settings
-          vim.api.nvim_exec_autocmds("User", { pattern = "GUIModeApplied" })
-        end
       end,
     },
     {
@@ -85,14 +77,8 @@ function M.setup(languages_config)
         local lspconfig = require("lspconfig")
         -- Standard keybindings for all LSP servers
         local on_attach = function(_, bufnr)
-          -- Use _ instead of client to indicate unused parameter
-          local opts = { noremap=true, silent=true, buffer=bufnr }
-          vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)
-          vim.keymap.set('n', 'K', vim.lsp.buf.hover, opts)
-          vim.keymap.set('n', '<leader>rn', vim.lsp.buf.rename, opts)
-          vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, opts)
-          vim.keymap.set('n', 'gr', vim.lsp.buf.references, opts)
-          vim.keymap.set('n', '<leader>f', function() vim.lsp.buf.format { async = true } end, opts)
+          -- Delegate to centralized keymaps module
+          _G.require_and_setup("custom.keymaps", "setup_lsp", bufnr)
         end
         -- LSP capabilities (with cmp integration if available)
         local capabilities = vim.lsp.protocol.make_client_capabilities()
@@ -255,8 +241,10 @@ function M.setup(languages_config)
   return plugins
 end
 
--- Initialize Lazy.nvim
-function M.init(languages_config)
+-- Initialize Lazy.nvim and configure plugins
+function M.setup()
+  local languages_config = _G.require_and_setup("custom.languages", false) or {}
+
   -- Configure lazy.nvim plugin manager if it exists
   local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 
@@ -281,7 +269,7 @@ function M.init(languages_config)
   end
 
   -- Configure plugins with lazy.nvim
-  lazy.setup(M.setup(languages_config))
+  lazy.setup(M.build_specs(languages_config))
 
   -- Add a command to run the linter
   vim.api.nvim_create_user_command("Lint", function()
@@ -292,11 +280,8 @@ function M.init(languages_config)
   if languages_config.lazy_plugins then
     lazy.setup(languages_config.lazy_plugins)
   end
-end
 
--- Setup TSReinstall command
-function M.setup_treesitter_commands()
-  -- Add a command to force reinstallation of TreeSitter parsers
+  -- Setup TSReinstall command to force reinstallation of TreeSitter parsers
   vim.api.nvim_create_user_command("TSReinstall", function()
     local cache_dir = vim.fn.stdpath("cache")
     local parser_dir = cache_dir .. "/treesitter"
