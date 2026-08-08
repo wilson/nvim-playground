@@ -143,7 +143,7 @@ end
 
 function M.apply_terminal_mode(theme)
   local utils = _G.require_and_setup("custom.utils", false)
-  if utils.is_headless() then
+  if utils and utils.is_headless() then
     return
   end
 

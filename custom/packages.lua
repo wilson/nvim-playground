@@ -229,6 +229,7 @@ function M.build_specs(languages_config)
         nvim_lint.linters_by_ft = languages_config.linters_by_ft or {}
 
         -- Use autocmd to trigger linting on changes
+        ---@diagnostic disable-next-line: param-type-mismatch
         vim.api.nvim_create_autocmd({ "BufWritePost", "BufEnter" }, {
           callback = function()
             require("lint").try_lint()
