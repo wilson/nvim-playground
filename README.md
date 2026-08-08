@@ -18,7 +18,7 @@ A modular Neovim configuration with support for GUI and terminal environments.
 
 ## Commands
 
-- `:BasicMode` - Switch to basic ANSI colors
+- `:TerminalMode` - Switch to basic ANSI colors
 - `:GUIMode` - Switch to GUI mode with true colors
 - `:ColorAnalyze` - Analyze color scheme information
 - `:Diagnostics` - Show terminal and system diagnostics

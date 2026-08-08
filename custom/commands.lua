@@ -13,6 +13,12 @@ function M.setup_color_analyze()
     if not color_analyze then return end
     -- Run the analysis
     local output = color_analyze.run_analysis()
+
+    -- Strip trailing whitespace from all lines globally to prevent error highlights
+    for i, line in ipairs(output) do
+      output[i] = line:gsub("%s+$", "")
+    end
+
     -- Create buffer and display results
     local buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_lines(buf, 0, -1, false, output)

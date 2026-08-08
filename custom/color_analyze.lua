@@ -251,7 +251,7 @@ function M.format_highlights_table(combined_results)
     "%-" .. col_width.term_fg .. "s" ..
     "%-" .. col_width.term_bg .. "s" ..
     "%-" .. col_width.suggested .. "s" ..
-    "%-" .. col_width.attrs .. "s",
+    "%s",
     "Group", "GUI FG", "GUI BG", "Term FG", "Term BG", "Suggested", "Attributes"
   ))
 
@@ -267,7 +267,7 @@ function M.format_highlights_table(combined_results)
   -- Add data rows
   for _, group in ipairs(sorted_groups) do
     local gui_info = combined_results[group].GUIMode
-    local term_info = combined_results[group].BasicMode
+    local term_info = combined_results[group].TerminalMode
 
     if gui_info then  -- Only show groups that exist in GUIMode
       -- Get current values
@@ -306,7 +306,7 @@ function M.format_highlights_table(combined_results)
         "%-" .. col_width.term_fg .. "s" ..
         "%-" .. col_width.term_bg .. "s" ..
         "%-" .. col_width.suggested .. "s" ..
-        "%-" .. col_width.attrs .. "s",
+        "%s",
         group, gui_fg, gui_bg, term_fg, term_bg, suggested, attrs
       ))
     end
@@ -342,21 +342,23 @@ function M.format_mapping_table()
         row = row .. string.format("%-" .. map_width .. "s", map.hex .. " → " .. map.term)
       end
     end
+    -- Trim any trailing whitespace
+    row = row:gsub("%s+$", "")
     table.insert(output, row)
   end
 
   return output
 end
 
--- Generate highlight commands for BasicMode
+-- Generate highlight commands for TerminalMode
 function M.generate_highlight_commands(combined_results)
   local output = {}
   local known_mappings = M.get_known_mappings()
 
   table.insert(output, "")
-  table.insert(output, "Vim Highlight Commands for BasicMode:")
+  table.insert(output, "Vim Highlight Commands for TerminalMode:")
   table.insert(output, "===================================")
-  table.insert(output, "Use these commands in your BasicMode configuration:")
+  table.insert(output, "Use these commands in your TerminalMode configuration:")
   table.insert(output, "")
 
   -- Key highlight groups
@@ -370,7 +372,7 @@ function M.generate_highlight_commands(combined_results)
   for _, group in ipairs(key_groups) do
     if combined_results[group] and combined_results[group].GUIMode then
       local gui = combined_results[group].GUIMode
-      local term = combined_results[group].BasicMode
+      local term = combined_results[group].TerminalMode
 
       -- Calculate best terminal colors
       local best_fg = term and term.ctermfg or "none"
@@ -431,7 +433,7 @@ function M.run_analysis()
 
   -- Restore original mode
   if starting_mode then
-    vim.cmd("BasicMode")
+    vim.cmd("TerminalMode")
   else
     vim.cmd("GUIMode")
   end
@@ -447,7 +449,7 @@ function M.run_analysis()
     "Color Scheme Analysis - " .. current_colorscheme,
     "============================================",
     "",
-    "This analysis compares highlight groups between BasicMode and GUIMode",
+    "This analysis compares highlight groups between TerminalMode and GUIMode",
     "Both modes use the " .. current_colorscheme .. " colorscheme with different settings.",
     ""
   }
