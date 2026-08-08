@@ -2,7 +2,7 @@
 local M = {}
 
 -- Use the font availability checking from utils.lua
-local utils = require("config.utils")
+local utils = require("custom.utils")
 
 -- Cache for pre-validated fonts to avoid trying unavailable fonts
 M._validated_fonts = {}
@@ -129,16 +129,16 @@ function M.create_persistent_notification(msg, level)
 
   -- Add key mappings to close the notification
   vim.api.nvim_buf_set_keymap(M._notification_buf, "n", "q",
-    ":lua require('config.fonts')._close_notification()<CR>",
+    ":lua require('custom.fonts')._close_notification()<CR>",
     {noremap = true, silent = true})
   vim.api.nvim_buf_set_keymap(M._notification_buf, "n", "<Esc>",
-    ":lua require('config.fonts')._close_notification()<CR>",
+    ":lua require('custom.fonts')._close_notification()<CR>",
     {noremap = true, silent = true})
   vim.api.nvim_buf_set_keymap(M._notification_buf, "n", "<CR>",
-    ":lua require('config.fonts')._close_notification()<CR>",
+    ":lua require('custom.fonts')._close_notification()<CR>",
     {noremap = true, silent = true})
   vim.api.nvim_buf_set_keymap(M._notification_buf, "n", "<Space>",
-    ":lua require('config.fonts')._close_notification()<CR>",
+    ":lua require('custom.fonts')._close_notification()<CR>",
     {noremap = true, silent = true})
 
   -- Auto-close after 30 seconds
@@ -343,7 +343,7 @@ end
 
 -- Helper function to read font preferences from JSON
 function M.read_font_config()
-  local config_path = vim.fn.stdpath("config") .. "/config/fonts.json"
+  local config_path = vim.fn.stdpath("config") .. "/custom/fonts.json"
   if vim.fn.filereadable(config_path) == 1 then
     local content = vim.fn.readfile(config_path)
     -- Join lines in case readfile returns multiple lines

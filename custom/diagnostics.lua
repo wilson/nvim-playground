@@ -6,7 +6,7 @@
 local M = {}
 
 -- Get the utility functions
-local utils = require("config.utils")
+local utils = require("custom.utils")
 
 -- Helper function to get environment information for diagnostics
 function M.get_env_info()
@@ -311,7 +311,7 @@ function M.get_nvim_settings()
       end
 
       -- Show information about pre-validated fonts from fonts.lua
-      local fonts_module = require("config.fonts")
+      local fonts_module = require("custom.fonts")
       if fonts_module._validated_fonts and not vim.tbl_isempty(fonts_module._validated_fonts) then
         table.insert(settings, "")
         table.insert(settings, "  Pre-validated fonts (safe for nvim-qt):")

@@ -8,7 +8,7 @@ local M = {}
 -- Function to set up the basic terminal mode colors and settings
 function M.force_reset_syntax()
   -- Skip in headless mode
-  local utils = require("config.utils")
+  local utils = require("custom.utils")
   if utils.is_headless() then
     return
   end
@@ -197,10 +197,10 @@ function M.setup_commands()
     vim.opt.termguicolors = true
 
     -- Set guifont if in a GUI environment
-    local utils = require("config.utils")
+    local utils = require("custom.utils")
     if utils.is_gui_environment() then
       -- Load the fonts module
-      local fonts = require("config.fonts")
+      local fonts = require("custom.fonts")
 
       -- Now set the best available font from configuration
       -- This prevents any warnings or errors from nvim-qt
@@ -263,7 +263,7 @@ function M.setup_autocmds()
     pattern = {"GuiLoaded", "GUIEnter"},
     callback = function()
       -- Use dedicated font handling module for fonts
-      local fonts = require("config.fonts")
+      local fonts = require("custom.fonts")
 
       -- Set the best available font from configuration
       fonts.set_best_font()
@@ -301,7 +301,7 @@ function M.setup_autocmds()
       end
 
       -- Check for GUI environment or legacy terminal
-      local utils = require("config.utils")
+      local utils = require("custom.utils")
       local in_gui = utils.is_gui_environment()
       local is_apple = utils.is_apple_terminal()
 

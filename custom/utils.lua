@@ -88,23 +88,6 @@ function M.init_font_detection()
   end
 end
 
--- Check if a font name is in the built-in macOS system fonts
-function M.check_macos_builtin_font(font_base, verbose)
-  -- SF Mono is handled separately now in is_font_available
-  -- so we don't need to check for it here
-
-  -- Built-in macOS system fonts
-  if font_base == "Menlo" or font_base == "Monaco" then
-    if verbose then
-      table.insert(M._font_detection_log[font_base],
-        "Built-in system font: " .. font_base .. " is available by default on macOS")
-    end
-
-    return true
-  end
-
-  return nil -- Not a built-in macOS font
-end
 
 -- Log font detection result and update cache
 function M.log_font_result(font_base, is_available, verbose)
@@ -145,25 +128,6 @@ function M.is_font_available(font_name, verbose)
     return M._font_cache[font_base]
   end
 
-  -- We need special handling for SF Mono since it's a macOS font with a special naming scheme
-  if font_base == "SF Mono" and vim.fn.has("macunix") == 1 then
-    local sf_mono_path = vim.fn.expand("~/Library/Fonts/SF-Mono-Regular.otf")
-    if vim.fn.filereadable(sf_mono_path) == 1 then
-      if verbose then
-        table.insert(M._font_detection_log[font_base],
-          "✓ Found SF Mono at " .. sf_mono_path)
-      end
-      return M.log_font_result(font_base, true, verbose)
-    end
-  end
-
-  -- Check for built-in macOS system fonts
-  if vim.fn.has("macunix") == 1 then
-    local builtin_result = M.check_macos_builtin_font(font_base, verbose)
-    if builtin_result ~= nil then
-      return M.log_font_result(font_base, builtin_result, verbose)
-    end
-  end
 
   -- Check for fonts in standard system directories
   if verbose then

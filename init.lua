@@ -5,7 +5,7 @@
 
 local init = {}
 
--- Add the "config" subdir to the Lua package path.
+-- Add the config dir to the Lua package path.
 local config_dir = vim.fn.stdpath("config")
 package.path = config_dir .. "/?.lua;" .. package.path
 
@@ -20,7 +20,7 @@ end
 
 -- Helper function to safely load the language configuration
 local function load_language_config()
-  local result, err = safe_require("config.languages")
+  local result, err = safe_require("custom.languages")
   if not result then
     vim.notify("Failed to load language configuration: " .. (err or "unknown error"), vim.log.levels.WARN)
     return {}
@@ -58,7 +58,7 @@ end
 -- Setup basic color mode.
 -- See :BasicMode vs. :GUIMode in color_modes.lua for details.
 function init.setup_basic_mode()
-  local color_modes, err = safe_require("config.color_modes")
+  local color_modes, err = safe_require("custom.color_modes")
   if color_modes then
     color_modes.init()
   else
@@ -81,7 +81,7 @@ function init.setup()
   local languages_config = load_language_config()
 
   -- Load and initialize plugin manager
-  local plugins, err = safe_require("config.plugins")
+  local plugins, err = safe_require("custom.plugins")
   if plugins then
     plugins.init(languages_config)
     plugins.setup_treesitter_commands()
@@ -90,7 +90,7 @@ function init.setup()
   end
 
   -- Set up commands
-  local commands, commands_err = safe_require("config.commands")
+  local commands, commands_err = safe_require("custom.commands")
   if commands then
     commands.setup()
   else
@@ -98,7 +98,7 @@ function init.setup()
   end
 
   -- Set up diagnostics
-  local diagnostics, diag_err = safe_require("config.diagnostics")
+  local diagnostics, diag_err = safe_require("custom.diagnostics")
   if diagnostics then
     diagnostics.setup()
   else
@@ -118,11 +118,6 @@ function init.setup()
     desc = "Ensure hard tabs are used in Makefiles",
   })
 
-  -- Neovide-specific
-  if vim.g.neovide then
-    vim.opt.columns = 150
-    vim.opt.lines = 60
-  end
 end
 
 -- Make it so
