@@ -182,6 +182,7 @@ function M.build_specs(languages_config)
     -- Treesitter for better syntax highlighting and more
     {
       "nvim-treesitter/nvim-treesitter",
+      branch = "master",
       dependencies = { "nvim-treesitter/nvim-treesitter-textobjects" },
       build = ":TSUpdate",
       config = function()
