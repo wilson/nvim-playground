@@ -1,8 +1,6 @@
 ------------------------------------------
--- Diagnostics Module
 -- Functionality for system diagnostics and environment information
 ------------------------------------------
-
 local M = {}
 
 -- Get the utility functions

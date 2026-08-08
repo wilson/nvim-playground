@@ -1,3 +1,6 @@
+------------------------------------------
+-- Implement Terminal-mode behavior including legacy 256-color support
+------------------------------------------
 local M = {}
 
 function M.apply_256_fallback_syntax()

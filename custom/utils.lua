@@ -1,8 +1,6 @@
 ------------------------------------------
--- Utilities Module
 -- Common functions and utilities used across the configuration
 ------------------------------------------
-
 local M = {}
 
 -- Function to check if running in a GUI environment

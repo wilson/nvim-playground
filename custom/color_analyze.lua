@@ -1,6 +1,7 @@
+-----------------------------------------------------------
 -- Color analysis module for comparing highlight groups between different modes
--- This module is used by the ColorAnalyze command
-
+-- Used by the ColorAnalyze command
+-----------------------------------------------------------
 local M = {}
 
 -- List of highlight groups to analyze

@@ -1,8 +1,6 @@
 ------------------------------------------
--- Commands Module
 -- Sets up user commands that aren't part of other modules
 ------------------------------------------
-
 local M = {}
 
 -- Setup ColorAnalyze command

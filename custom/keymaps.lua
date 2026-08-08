@@ -1,3 +1,6 @@
+------------------------------------------
+-- All keymaps not provided directly by packages
+------------------------------------------
 local M = {}
 
 function M.setup()
@@ -6,6 +9,7 @@ function M.setup()
   vim.keymap.set('n', '<leader>W', vim.diagnostic.setloclist, { noremap = true, silent = true, desc = "Show diagnostics list" })
 end
 
+-- Invoked on-attach by the LSP package.
 function M.setup_lsp(bufnr)
   local opts = { noremap = true, silent = true, buffer = bufnr }
   vim.keymap.set('n', 'gd', vim.lsp.buf.definition, opts)

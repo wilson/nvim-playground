@@ -1,8 +1,6 @@
 ------------------------------------------
--- Plugins Module
--- Handles plugin configuration and setup
+-- Package configuration using Lazy.nvim
 ------------------------------------------
-
 local M = {}
 
 -- Configure Lazy.nvim and set up plugins

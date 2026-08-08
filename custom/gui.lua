@@ -1,3 +1,6 @@
+------------------------------------------
+-- Implements GUI-mode behaviors
+------------------------------------------
 local M = {}
 
 function M.apply_gui_mode(theme)

@@ -1,4 +1,6 @@
--- Font handling module for Neovim configuration
+------------------------------------------
+-- Font handling module; see fonts.json for config
+------------------------------------------
 local M = {}
 
 -- Use the font availability checking from utils.lua
