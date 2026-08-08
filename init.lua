@@ -117,6 +117,12 @@ function init.setup()
     end,
     desc = "Ensure hard tabs are used in Makefiles",
   })
+
+  -- Neovide-specific
+  if vim.g.neovide then
+    vim.opt.columns = 150
+    vim.opt.lines = 60
+  end
 end
 
 -- Make it so

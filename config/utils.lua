@@ -20,13 +20,8 @@ function M.is_gui_environment()
     return true
   end
 
-  -- Check for basic Neovim GUI detection
-  if vim.fn.has('gui_running') == 1 then
-    return true
-  end
-
-  -- Simple fallback for other GUI environments
-  if vim.g.neovide or vim.env.NVIM_GUI then
+  -- Check for Neovide
+  if vim.g.neovide then
     return true
   end
 
