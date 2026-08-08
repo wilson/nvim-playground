@@ -4,6 +4,7 @@ A modular Neovim configuration with support for GUI and terminal environments.
 
 ## Features
 
+- Cross-platform on macOS, FreeBSD, Linux, and Windows (MSYS2)
 - Modular design with clean separation of concerns
 - Automatic GUI detection with enhanced features
 - Language server integration via Mason
@@ -11,9 +12,9 @@ A modular Neovim configuration with support for GUI and terminal environments.
 
 ## Installation
 
-```bash
+```sh
 # Install language servers, linters, and TreeSitter parsers
-./install_dev_tools.sh
+make install
 ```
 
 ## Commands
@@ -22,3 +23,10 @@ A modular Neovim configuration with support for GUI and terminal environments.
 - `:GUIMode` - Switch to GUI mode with true colors
 - `:ColorAnalyze` - Analyze color scheme information
 - `:Diagnostics` - Show terminal and system diagnostics
+
+## Development
+
+```sh
+# Run shellcheck and luacheck on the relevant files
+make lint
+```
