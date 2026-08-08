@@ -1,13 +1,11 @@
 -----------------------------------------------------------
--- Module: Core Initialization
--- Handles initial setup of Neovim including bootstrapping lazy.nvim
+-- Module: Init
+-- Handles Neovim startup, configures lazy.nvim
 -----------------------------------------------------------
 
--- Module initialization
 local init = {}
 
--- Fix the Lua package path to include our config directory
--- This ensures require("config.xyz") will work properly
+-- Add the "config" subdir to the Lua package path.
 local config_dir = vim.fn.stdpath("config")
 package.path = config_dir .. "/?.lua;" .. package.path
 
@@ -55,20 +53,11 @@ function init.basic_setup()
   vim.opt.splitright = true           -- Split right of current window
   vim.opt.mouse = "a"                 -- Enable mouse in all modes
   vim.opt.shortmess:append("I")       -- Disable intro message
-
-  -- Filetype specific overrides
-  vim.api.nvim_create_autocmd("FileType", {
-    pattern = "make",
-    callback = function()
-      vim.opt_local.expandtab = false
-    end,
-    desc = "Ensure hard tabs are used in Makefiles",
-  })
 end
 
--- Setup basic color mode
+-- Setup basic color mode.
+-- See :BasicMode vs. :GUIMode in color_modes.lua for details.
 function init.setup_basic_mode()
-  -- Load the color modes module
   local color_modes, err = safe_require("config.color_modes")
   if color_modes then
     color_modes.init()
@@ -79,14 +68,13 @@ end
 
 -- Main setup function
 function init.setup()
-  -- Basic settings first
   init.basic_setup()
 
   -- Default leader key
   vim.g.mapleader = "\\"
   vim.g.maplocalleader = "\\"
 
-  -- Initialize basic color mode
+  -- Initialize default color mode
   init.setup_basic_mode()
 
   -- Load languages configuration
@@ -121,8 +109,15 @@ function init.setup()
   vim.keymap.set('n', '<leader>w', vim.diagnostic.open_float, { noremap = true, silent = true, desc = "Show diagnostics float" })
   vim.keymap.set('n', '<leader>W', vim.diagnostic.setloclist, { noremap = true, silent = true, desc = "Show diagnostics list" })
 
-  -- Key repeat fix is now handled by DYLD injection in ~/.config/nvim/qt-keyrepeat-fix
+  -- Filetype specific overrides
+  vim.api.nvim_create_autocmd("FileType", {
+    pattern = "make",
+    callback = function()
+      vim.opt_local.expandtab = false
+    end,
+    desc = "Ensure hard tabs are used in Makefiles",
+  })
 end
 
--- Run the setup
+-- Make it so
 init.setup()
