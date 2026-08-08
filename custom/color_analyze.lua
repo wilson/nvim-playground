@@ -59,16 +59,18 @@ end
 function M.get_hl_format(group_name)
   local ctermfg, ctermbg, cterm, gui
 
-  -- Safely get highlight attributes
-  local ok, hl = pcall(vim.api.nvim_get_hl, 0, {name = group_name})
-  if not ok or not hl then
+  -- Get highlight attributes
+  local hl = vim.api.nvim_get_hl(0, {name = group_name})
+  if not hl then
     hl = {}
   end
 
-  -- Safely get terminal color codes
-  local cmd_ok, result = pcall(vim.api.nvim_exec2, "highlight " .. group_name, {output = true})
-  if cmd_ok and result and result.output then
-    ctermfg, ctermbg, cterm, gui = extract_hl_attributes(result.output)
+  -- Get terminal color codes if the group exists
+  if vim.fn.hlexists(group_name) == 1 then
+    local result = vim.api.nvim_exec2("highlight " .. group_name, {output = true})
+    if result and result.output then
+      ctermfg, ctermbg, cterm, gui = extract_hl_attributes(result.output)
+    end
   end
 
   -- Format colors as hex
@@ -195,8 +197,8 @@ function M.capture_current_highlights()
   for _, group in ipairs(M.highlight_groups) do
     -- Check if the highlight group exists first
     if vim.fn.hlID(group) > 0 then
-      local ok, info = pcall(M.get_hl_format, group)
-      if ok then
+      local info = M.get_hl_format(group)
+      if info then
         table.insert(results, info)
       end
     end
@@ -411,36 +413,29 @@ function M.run_analysis()
   local other_mode = starting_mode and "GUIMode" or "TerminalMode"
   local other_results = {}
 
-  -- Safely try to switch modes and capture other state
-  local switch_ok, _ = pcall(function()
-    -- Switch modes
-    if vim.g.terminal_mode then
-      -- Currently in TerminalMode, switch to GUIMode
-      vim.cmd("GUIMode")
-    else
-      -- Currently in GUIMode, switch to TerminalMode
-      vim.cmd("TerminalMode")
-    end
-
-    -- Wait for highlighting to apply
-    vim.cmd("redraw!")
-    vim.cmd("sleep 200m") -- Ensure highlighting is fully applied
-
-    -- Capture the other mode's results
-    other_results = M.capture_current_highlights()
-
-    -- Restore original mode
-    if starting_mode then
-      vim.cmd("BasicMode")
-    else
-      vim.cmd("GUIMode")
-    end
-    vim.cmd("redraw!")
-  end)
-
-  if not switch_ok then
-    vim.notify("Error switching color modes. Analysis will be limited.", vim.log.levels.WARN)
+  -- Switch modes
+  if vim.g.terminal_mode then
+    -- Currently in TerminalMode, switch to GUIMode
+    vim.cmd("GUIMode")
+  else
+    -- Currently in GUIMode, switch to TerminalMode
+    vim.cmd("TerminalMode")
   end
+
+  -- Wait for highlighting to apply
+  vim.cmd("redraw!")
+  vim.cmd("sleep 200m") -- Ensure highlighting is fully applied
+
+  -- Capture the other mode's results
+  other_results = M.capture_current_highlights()
+
+  -- Restore original mode
+  if starting_mode then
+    vim.cmd("BasicMode")
+  else
+    vim.cmd("GUIMode")
+  end
+  vim.cmd("redraw!")
 
   -- Combine results
   local combined_results = M.combine_mode_results(

@@ -82,8 +82,8 @@ function M.build_specs(languages_config)
         end
         -- LSP capabilities (with cmp integration if available)
         local capabilities = vim.lsp.protocol.make_client_capabilities()
-        local has_cmp, cmp_nvim_lsp = pcall(require, "cmp_nvim_lsp")
-        if has_cmp then
+        local cmp_nvim_lsp = _G.require_and_setup("cmp_nvim_lsp", false)
+        if cmp_nvim_lsp then
           capabilities = cmp_nvim_lsp.default_capabilities(capabilities)
         end
         -- Get server-specific settings
@@ -262,11 +262,8 @@ function M.setup()
   vim.opt.rtp:prepend(lazypath)
 
   -- Initialize plugins with lazy.nvim
-  local lazy_ok, lazy = pcall(require, "lazy")
-  if not lazy_ok then
-    vim.notify("Failed to load lazy.nvim plugin manager. Plugins will not be available.", vim.log.levels.WARN)
-    return
-  end
+  local lazy = _G.require_and_setup("lazy", false)
+  if not lazy then return end
 
   -- Configure plugins with lazy.nvim
   lazy.setup(M.build_specs(languages_config))

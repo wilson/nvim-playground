@@ -60,12 +60,12 @@ function M.create_persistent_notification(msg, level)
 
   -- Close existing notification if it exists
   if M._notification_win and vim.api.nvim_win_is_valid(M._notification_win) then
-    pcall(vim.api.nvim_win_close, M._notification_win, true)
+    vim.api.nvim_win_close(M._notification_win, true)
   end
 
   -- Cancel existing timer
   if M._notification_timer then
-    pcall(vim.fn.timer_stop, M._notification_timer)
+    vim.fn.timer_stop(M._notification_timer)
     M._notification_timer = nil
   end
 
@@ -152,12 +152,12 @@ end
 -- Close the notification window
 function M._close_notification()
   if M._notification_win and vim.api.nvim_win_is_valid(M._notification_win) then
-    pcall(vim.api.nvim_win_close, M._notification_win, true)
+    vim.api.nvim_win_close(M._notification_win, true)
     M._notification_win = nil
   end
 
   if M._notification_timer then
-    pcall(vim.fn.timer_stop, M._notification_timer)
+    vim.fn.timer_stop(M._notification_timer)
     M._notification_timer = nil
   end
 end
@@ -190,22 +190,12 @@ function M.log_font_message(msg, level)
   if level == "error" or level == "warning" or
      (level == "debug" and vim.env.NVIM_FONT_DEBUG) or
      (level == "info" and vim.env.NVIM_FONT_DEBUG) then
-    -- First try to create the notification right away (in case scheduling fails)
-    local ok, err = pcall(M.create_persistent_notification, msg, level)
-
-    if not ok then
-      -- If immediate notification fails, try scheduling it
+    if vim.v.vim_did_enter == 1 then
+      M.create_persistent_notification(msg, level)
+    else
       vim.schedule(function()
-        pcall(M.create_persistent_notification, msg, level)
+        M.create_persistent_notification(msg, level)
       end)
-
-      -- Log the error to our font message history
-      local error_timestamp = os.date("%Y-%m-%d %H:%M:%S")
-      table.insert(M._font_message_history, {
-        timestamp = error_timestamp,
-        level = "error",
-        message = "Error creating font notification: " .. tostring(err)
-      })
     end
   end
 end

@@ -138,9 +138,9 @@ M.server_settings = {
     },
     setup = function(server)
       -- Check if schemastore plugin is available
-      local has_schemastore, schemastore = pcall(require, "schemastore")
+      local schemastore = _G.require_and_setup("schemastore", false)
       -- Only apply schema settings if schemastore is available
-      if has_schemastore then
+      if schemastore then
         -- Ensure server.settings.json exists
         server.settings = server.settings or {}
         server.settings.json = server.settings.json or {}
@@ -161,8 +161,8 @@ M.server_settings = {
     },
     setup = function(server)
       -- Will only be used if schemastore plugin is installed
-      local has_schemastore, schemastore = pcall(require, "schemastore")
-      if has_schemastore then
+      local schemastore = _G.require_and_setup("schemastore", false)
+      if schemastore then
         -- Ensure settings.yaml exists
         server.settings = server.settings or {}
         server.settings.yaml = server.settings.yaml or {}

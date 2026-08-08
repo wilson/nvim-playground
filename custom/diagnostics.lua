@@ -41,32 +41,32 @@ end
 function M.get_nvim_settings()
   -- Safely check for GUI environment
   local gui_status = "No"
-  pcall(function()
+  do
     gui_status = utils.is_gui_environment() and "Yes" or "No"
-  end)
+  end
 
   -- Safely get termguicolors setting
   local termguicolors = "Unknown"
-  pcall(function()
+  do
     termguicolors = tostring(vim.opt.termguicolors:get())
-  end)
+  end
 
   -- Safely get version info with multiple methods
   local version = "Unknown"
 
   -- Try primary method: Using vim.version() function
-  pcall(function()
+  do
     if vim.version and type(vim.version) == "function" then
       local v = vim.version()
       if v and type(v) == "table" and v.major and v.minor and v.patch then
         version = v.major .. "." .. v.minor .. "." .. v.patch
       end
     end
-  end)
+  end
 
   -- Fallback method: Using nvim -v output captured via system command
   if version == "Unknown" then
-    pcall(function()
+    do
       -- Get nvim version using external command
       local output = vim.fn.system("nvim --version | head -n 1")
       if output and type(output) == "string" then
@@ -76,7 +76,7 @@ function M.get_nvim_settings()
           version = ver
         end
       end
-    end)
+    end
   end
 
   -- Start with basic settings
@@ -104,7 +104,7 @@ function M.get_nvim_settings()
     elseif vim.fn.has('gui_running') == 1 then
       -- Check if nvim-qt is in the parent process path
       local is_nvim_qt = false
-      pcall(function()
+      do
         if vim.fn.has('unix') == 1 then
           local ppid_cmd = vim.fn.system("ps -o ppid= -p " .. vim.fn.getpid() .. " | tr -d ' \n'")
           if ppid_cmd and #ppid_cmd > 0 then
@@ -114,7 +114,7 @@ function M.get_nvim_settings()
             end
           end
         end
-      end)
+      end
 
       -- Set client based on detection
       if is_nvim_qt then
@@ -126,7 +126,7 @@ function M.get_nvim_settings()
 
     -- Get nvim-qt process info and version if possible
     local gui_app_name = ""
-    pcall(function()
+    do
       if vim.fn.has('unix') == 1 then
         -- Get nvim info
         local nvim_version = vim.version()
@@ -150,13 +150,13 @@ function M.get_nvim_settings()
 
         gui_app_name = gui_app_name .. ")"
       end
-    end)
+    end
 
     table.insert(settings, "  GUI client: " .. gui_client .. gui_app_name)
 
     -- Get font information with improved detection and detailed process display
     M.add_font_detection_header(settings)
-    pcall(function()
+    do
       local font = "Unknown"
       local font_source = ""
 
@@ -180,8 +180,8 @@ function M.get_nvim_settings()
 
           if vim.fn.exists("+guifont") == 1 then
             -- Try getting via direct command
-            local ok, cmd_font = pcall(vim.api.nvim_exec2, "set guifont?", {output = true})
-            if ok and cmd_font and cmd_font.output then
+            local cmd_font = vim.api.nvim_exec2("set guifont?", {output = true})
+            if cmd_font and cmd_font.output then
               local stripped = cmd_font.output:gsub("guifont=", ""):gsub("^%s*(.-)%s*$", "%1")
               if stripped ~= "" then
                 font = stripped
@@ -408,28 +408,28 @@ function M.get_nvim_settings()
         table.insert(settings, "    cp /System/Applications/Utilities/Terminal.app/Contents/Resources/Fonts/SF-*.otf ~/Library/Fonts/")
         table.insert(settings, "    The install_dev_tools.sh script will attempt to install these fonts automatically")
       end
-    end)
+    end
 
     -- Try to get window dimensions
-    pcall(function()
+    do
       local width = vim.api.nvim_win_get_width(0)
       local height = vim.api.nvim_win_get_height(0)
       if width > 0 and height > 0 then
         table.insert(settings, "  Window size: " .. width .. "×" .. height)
       end
-    end)
+    end
 
     -- Check for macOS key repeat fix
-    pcall(function()
+    do
       if vim.fn.has('mac') == 1 and vim.g.GuiLoaded then
         local env_var = os.getenv("DYLD_INSERT_LIBRARIES")
         local has_fix = env_var and env_var:match("KeyRepeatFix") ~= nil
         table.insert(settings, "  Key repeat fix: " .. (has_fix and "Active" or "Not active"))
       end
-    end)
+    end
 
     -- Check for full GUI features
-    pcall(function()
+    do
       local features = {}
       -- nvim-qt specific features
       if vim.g.GuiLoaded then
@@ -448,10 +448,10 @@ function M.get_nvim_settings()
       if #features > 0 then
         table.insert(settings, "  GUI features: " .. table.concat(features, ", "))
       end
-    end)
+    end
 
     -- Add GUI environment variables if any are present
-    pcall(function()
+    do
       local gui_env_vars = {}
       local env_var_names = {"QT_QPA_PLATFORM", "WAYLAND_DISPLAY", "DISPLAY", "NVIM_QT_PATH"}
 
@@ -465,7 +465,7 @@ function M.get_nvim_settings()
       if #gui_env_vars > 0 then
         table.insert(settings, "  GUI environment vars: " .. table.concat(gui_env_vars, ", "))
       end
-    end)
+    end
   end
 
   return settings
@@ -480,32 +480,18 @@ function M.get_treesitter_info()
   table.insert(ts_status, "TreeSitter:")
 
   -- Safely try to get TreeSitter parser info
-  local ts_ok, ts_parsers = pcall(require, "nvim-treesitter.parsers")
+  local ts_parsers = _G.require_and_setup("nvim-treesitter.parsers", false)
 
-  if not ts_ok then
+  if not ts_parsers then
     table.insert(ts_status, "  Installed: No (or not loaded)")
-    table.insert(ts_status, "  Status: Not available - " .. (type(ts_parsers) == "string" and ts_parsers:sub(1, 50) or "Unknown error"))
+    table.insert(ts_status, "  Status: Not available - Module not found")
     return ts_status
   end
 
   -- Safely get list of installed parsers
   local installed = {}
-  local parsers_ok = pcall(function()
-    if ts_parsers and type(ts_parsers.available_parsers) == "function" then
-      installed = ts_parsers.available_parsers() or {}
-    end
-  end)
-
-  -- If failed to get parsers, report the error
-  if not parsers_ok then
-    table.insert(ts_status, "  Installed: Yes, but parser list unavailable")
-    table.insert(ts_status, "  Error: Could not retrieve parser list")
-    return ts_status
-  end
-
-  -- Make sure installed is a table we can work with
-  if type(installed) ~= "table" then
-    installed = {}
+  if ts_parsers and type(ts_parsers.available_parsers) == "function" then
+    installed = ts_parsers.available_parsers() or {}
   end
 
   -- Add basic info
@@ -514,9 +500,9 @@ function M.get_treesitter_info()
 
   -- Safely check highlighting status
   local highlight_status = "Unknown"
-  pcall(function()
+  do
     highlight_status = tostring(not vim.g.terminal_mode)
-  end)
+  end
   table.insert(ts_status, "  Highlighting enabled: " .. highlight_status)
 
   -- Just show a summary of parsers instead of listing them all
@@ -527,7 +513,7 @@ function M.get_treesitter_info()
     local count = 0
 
     -- Try to find a few popular parsers to show as examples
-    pcall(function()
+    do
       for _, parser in ipairs(popular_parsers) do
         if count >= 3 then break end -- Show up to 3 examples
 
@@ -540,11 +526,11 @@ function M.get_treesitter_info()
           end
         end
       end
-    end)
+    end
 
     -- If we couldn't find popular parsers, use the first few
     if #examples == 0 and #installed > 0 then
-      pcall(function()
+      do
         -- Sort for consistency
         table.sort(installed)
         -- Take up to 3 from the front
@@ -553,7 +539,7 @@ function M.get_treesitter_info()
             table.insert(examples, installed[i])
           end
         end
-      end)
+      end
     end
 
     -- Add summary info
@@ -610,14 +596,14 @@ function M.get_terminal_diagnostics_info()
 
   -- Safely combine all sections with error handling
   local function safe_extend(section_getter)
-    pcall(function()
+    do
       local section = section_getter()
       if type(section) == "table" then
         vim.list_extend(info, section)
       else
         table.insert(info, "Error: Section returned non-table value")
       end
-    end)
+    end
   end
 
   -- Add each section with error handling
@@ -656,8 +642,7 @@ function M.add_color_test_blocks(buf)
   -- Create extmarks with different highlight groups
 
   -- First, create the section headers
-  local ok, err = pcall(function()
-    vim.api.nvim_buf_set_lines(buf, -1, -1, false, {
+  vim.api.nvim_buf_set_lines(buf, -1, -1, false, {
       "ANSI 16-Color Test:",
       "  Normal FG colors (30-37, 90-97):",
       "  X X X X", -- Using X instead of ■ which may not render properly
@@ -670,12 +655,6 @@ function M.add_color_test_blocks(buf)
       "",
       "Terminal 256-Color Test (16-255):",
     })
-  end)
-
-  if not ok then
-    vim.notify("Error adding color test headers: " .. tostring(err), vim.log.levels.ERROR)
-    return
-  end
 
   -- Get the current line count
   local line_count = vim.api.nvim_buf_line_count(buf)
@@ -972,101 +951,72 @@ end
 function M.setup()
   -- Create diagnostic function for terminal settings
   vim.api.nvim_create_user_command("Diagnostics", function()
-    -- Error handler for the diagnostics command
-    local function handle_diagnostic_error(msg)
-      vim.notify("Error in Diagnostics command: " .. msg, vim.log.levels.ERROR)
-      -- Try to provide a minimal diagnostic buffer even if there's an error
-      pcall(function()
-        local err_buf = vim.api.nvim_create_buf(false, true)
-        vim.api.nvim_set_current_buf(err_buf)
-        vim.api.nvim_buf_set_lines(err_buf, 0, -1, false, {
-          "Diagnostics Error",
-          "================",
-          "",
-          "Failed to generate complete diagnostics due to an error:",
-          msg,
-          "",
-          "Please check your Neovim configuration or report this issue."
-        })
-        vim.bo[err_buf].modifiable = false
-        vim.bo[err_buf].readonly = true
-        vim.bo[err_buf].buftype = "nofile"
-      end)
-    end
-
     -- Main diagnostics logic with error handling
-    local ok, err = pcall(function()
-      -- Create a new buffer to display terminal diagnostic information
-      local buf = vim.api.nvim_create_buf(false, true)
-      if not buf or buf < 1 then
-        error("Failed to create diagnostics buffer")
-      end
-
-      vim.api.nvim_set_current_buf(buf)
-      vim.bo[buf].buftype = "nofile"
-
-      -- Get terminal information
-      local lines = M.get_terminal_diagnostics_info()
-      vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-
-      -- Create a namespace for syntax highlighting
-      local ns_id = vim.api.nvim_create_namespace("diagnostics_header")
-
-      -- Add highlighting for headers (safely with pcall)
-      pcall(function()
-        utils.add_highlight(buf, ns_id, "Title", 0, 0, -1)
-        utils.add_highlight(buf, ns_id, "Special", 1, 0, -1)
-      end)
-
-      -- Only highlight section headers and keep the rest plain
-      -- This avoids any offset issues with variable/setting names
-      pcall(function()
-        -- Highlight just the "Environment variables:" header
-        for i = 1, #lines do
-          if lines[i] == "Environment variables:" then
-            utils.add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
-            break
-          end
-        end
-      end)
-
-      pcall(function()
-        -- Highlight just the "Neovim settings:" header
-        for i = 1, #lines do
-          if lines[i] == "Neovim settings:" then
-            utils.add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
-            break
-          end
-        end
-      end)
-
-      -- Highlight the commands section headers
-      pcall(function()
-        highlight_commands_section(buf, lines)
-      end)
-
-      -- Add color test blocks with proper highlighting
-      pcall(function()
-        M.add_color_test_blocks(buf)
-      end)
-
-      -- Add GUI-specific recommendations with highlighting
-      pcall(function()
-        M.add_recommendations(buf)
-      end)
-
-      -- Make the buffer read-only
-      vim.bo[buf].modifiable = false
-      vim.bo[buf].readonly = true
-      vim.bo[buf].filetype = "diagnostics"
-
-      vim.notify("System diagnostics created", vim.log.levels.INFO)
-    end)
-
-    -- Handle any errors that occurred
-    if not ok and err then
-      handle_diagnostic_error(tostring(err))
+    -- Create a new buffer to display terminal diagnostic information
+    local buf = vim.api.nvim_create_buf(false, true)
+    if not buf or buf < 1 then
+      error("Failed to create diagnostics buffer")
     end
+
+    vim.api.nvim_set_current_buf(buf)
+    vim.bo[buf].buftype = "nofile"
+
+    -- Get terminal information
+    local lines = M.get_terminal_diagnostics_info()
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+
+    -- Create a namespace for syntax highlighting
+    local ns_id = vim.api.nvim_create_namespace("diagnostics_header")
+
+    -- Add highlighting for headers
+    do
+      utils.add_highlight(buf, ns_id, "Title", 0, 0, -1)
+      utils.add_highlight(buf, ns_id, "Special", 1, 0, -1)
+    end
+
+    -- Only highlight section headers and keep the rest plain
+    -- This avoids any offset issues with variable/setting names
+    do
+      -- Highlight just the "Environment variables:" header
+      for i = 1, #lines do
+        if lines[i] == "Environment variables:" then
+          utils.add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
+          break
+        end
+      end
+    end
+
+    do
+      -- Highlight just the "Neovim settings:" header
+      for i = 1, #lines do
+        if lines[i] == "Neovim settings:" then
+          utils.add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
+          break
+        end
+      end
+    end
+
+    -- Highlight the commands section headers
+    do
+      highlight_commands_section(buf, lines)
+    end
+
+    -- Add color test blocks with proper highlighting
+    do
+      M.add_color_test_blocks(buf)
+    end
+
+    -- Add GUI-specific recommendations with highlighting
+    do
+      M.add_recommendations(buf)
+    end
+
+    -- Make the buffer read-only
+    vim.bo[buf].modifiable = false
+    vim.bo[buf].readonly = true
+    vim.bo[buf].filetype = "diagnostics"
+
+    vim.notify("System diagnostics created", vim.log.levels.INFO)
   end, {})
 end
 

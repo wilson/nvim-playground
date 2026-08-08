@@ -36,9 +36,13 @@ function M.add_highlight(buf, ns_id, hl_group, line, col_start, col_end)
       opts.end_col = col_end
       opts.end_row = line
     end
-    pcall(vim.api.nvim_buf_set_extmark, buf, ns_id, line, col_start, opts)
+    if vim.api.nvim_buf_is_valid(buf) then
+      vim.api.nvim_buf_set_extmark(buf, ns_id, line, col_start, opts)
+    end
   else
-    pcall(vim.api.nvim_buf_add_highlight, buf, ns_id, hl_group, line, col_start, col_end)
+    if vim.api.nvim_buf_is_valid(buf) then
+      vim.api.nvim_buf_add_highlight(buf, ns_id, hl_group, line, col_start, col_end)
+    end
   end
 end
 
@@ -62,11 +66,9 @@ end
 -- Safely get an environment variable with error handling
 function M.safe_get_env(var_name)
   local value = "not set"
-  pcall(function()
-    if vim.env and vim.env[var_name] then
-      value = vim.env[var_name]
-    end
-  end)
+  if vim.env and vim.env[var_name] then
+    value = vim.env[var_name]
+  end
   return value
 end
 

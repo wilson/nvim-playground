@@ -9,11 +9,8 @@ local M = {}
 function M.setup_color_analyze()
   vim.api.nvim_create_user_command("ColorAnalyze", function()
     -- Load the color analysis module
-    local ok, color_analyze = pcall(require, "custom.color_analyze")
-    if not ok then
-      vim.notify("Color analysis module not found", vim.log.levels.ERROR)
-      return
-    end
+    local color_analyze = _G.require_and_setup("custom.color_analyze", false)
+    if not color_analyze then return end
     -- Run the analysis
     local output = color_analyze.run_analysis()
     -- Create buffer and display results
@@ -34,11 +31,8 @@ end
 -- Setup FontMessages command
 function M.setup_font_messages()
   -- Load the fonts module
-  local ok, fonts = pcall(require, "custom.fonts")
-  if not ok then
-    vim.notify("Fonts module not found", vim.log.levels.ERROR)
-    return
-  end
+  local fonts = _G.require_and_setup("custom.fonts", false)
+  if not fonts then return end
 
   -- Create the FontMessages command via the fonts module
   fonts.setup_commands()
