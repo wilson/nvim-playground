@@ -142,7 +142,7 @@ function M.apply_256_fallback_syntax()
 end
 
 function M.apply_terminal_mode(theme)
-  local utils = require("custom.utils")
+  local utils = _G.require_and_setup("custom.utils", false)
   if utils.is_headless() then
     return
   end
@@ -150,7 +150,7 @@ function M.apply_terminal_mode(theme)
   local was_gui_mode = not vim.g.terminal_mode
 
   if vim.fn.exists(":TSBufDisable") == 2 then
-    pcall(vim.cmd, "TSBufDisable highlight")
+    vim.cmd("TSBufDisable highlight")
   end
 
   vim.opt.termguicolors = false
@@ -158,8 +158,10 @@ function M.apply_terminal_mode(theme)
   vim.opt.background = "dark"
 
   if theme then
-    local ok = pcall(vim.cmd, "colorscheme " .. theme)
-    if not ok then
+    local available = vim.fn.getcompletion(theme, "color")
+    if vim.tbl_contains(available, theme) then
+      vim.cmd("colorscheme " .. theme)
+    else
       vim.notify("Colorscheme '" .. theme .. "' not found. Colorscheme not applied.", vim.log.levels.WARN)
     end
   end

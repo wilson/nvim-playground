@@ -2,7 +2,7 @@
 local M = {}
 
 -- Use the font availability checking from utils.lua
-local utils = require("custom.utils")
+local utils = _G.require_and_setup("custom.utils", false)
 
 -- Cache for pre-validated fonts to avoid trying unavailable fonts
 M._validated_fonts = {}
@@ -75,14 +75,14 @@ function M.create_persistent_notification(msg, level)
   end
 
   -- Ensure buffer is modifiable before setting content
-  vim.api.nvim_buf_set_option(M._notification_buf, "modifiable", true)
+  vim.bo[M._notification_buf].modifiable = true
 
   -- Set buffer content
   vim.api.nvim_buf_set_lines(M._notification_buf, 0, -1, false, lines)
 
   -- Set buffer options (make read-only after content is set)
-  vim.api.nvim_buf_set_option(M._notification_buf, "modifiable", false)
-  vim.api.nvim_buf_set_option(M._notification_buf, "buftype", "nofile")
+  vim.bo[M._notification_buf].modifiable = false
+  vim.bo[M._notification_buf].buftype = "nofile"
 
   -- Calculate window dimensions
   local width = 60
@@ -106,8 +106,8 @@ function M.create_persistent_notification(msg, level)
   M._notification_win = vim.api.nvim_open_win(M._notification_buf, false, float_opts)
 
   -- Set window options
-  vim.api.nvim_win_set_option(M._notification_win, "wrap", true)
-  vim.api.nvim_win_set_option(M._notification_win, "cursorline", false)
+  vim.wo[M._notification_win].wrap = true
+  vim.wo[M._notification_win].cursorline = false
 
   -- Add highlighting
   local ns_id = vim.api.nvim_create_namespace("font_notification")
@@ -116,16 +116,16 @@ function M.create_persistent_notification(msg, level)
   vim.api.nvim_buf_clear_namespace(M._notification_buf, ns_id, 0, -1)
 
   -- Apply highlights
-  vim.api.nvim_buf_add_highlight(M._notification_buf, ns_id, highlight_group, 0, 0, -1) -- Header
-  vim.api.nvim_buf_add_highlight(M._notification_buf, ns_id, "Special", 1, 0, -1) -- Separator
+  utils.add_highlight(M._notification_buf, ns_id, highlight_group, 0, 0, -1) -- Header
+  utils.add_highlight(M._notification_buf, ns_id, "Special", 1, 0, -1) -- Separator
 
   -- Highlight all message lines
   for i = 1, #msg_lines do
-    vim.api.nvim_buf_add_highlight(M._notification_buf, ns_id, highlight_group, i + 1, 0, -1)
+    utils.add_highlight(M._notification_buf, ns_id, highlight_group, i + 1, 0, -1)
   end
 
   -- Highlight footer (last line)
-  vim.api.nvim_buf_add_highlight(M._notification_buf, ns_id, "Question", #lines - 1, 0, -1)
+  utils.add_highlight(M._notification_buf, ns_id, "Question", #lines - 1, 0, -1)
 
   -- Add key mappings to close the notification
   vim.api.nvim_buf_set_keymap(M._notification_buf, "n", "q",
@@ -249,13 +249,13 @@ function M.show_notification_history()
   table.insert(lines, "Use 'q' to close this window or press g< to see Neovim's notification history")
 
   -- Set buffer content (ensure it's modifiable first)
-  vim.api.nvim_buf_set_option(buf, "modifiable", true)
+  vim.bo[buf].modifiable = true
   vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 
   -- Set buffer options
-  vim.api.nvim_buf_set_option(buf, "modifiable", false)
-  vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
-  vim.api.nvim_buf_set_option(buf, "filetype", "fontnotifications")
+  vim.bo[buf].modifiable = false
+  vim.bo[buf].buftype = "nofile"
+  vim.bo[buf].filetype = "fontnotifications"
 
   -- Create a floating window
   local width = math.min(80, vim.o.columns - 4)
@@ -276,32 +276,32 @@ function M.show_notification_history()
   local win = vim.api.nvim_open_win(buf, true, win_opts)
 
   -- Set window options
-  vim.api.nvim_win_set_option(win, "wrap", true)
-  vim.api.nvim_win_set_option(win, "cursorline", true)
+  vim.wo[win].wrap = true
+  vim.wo[win].cursorline = true
 
   -- Add highlights
   local ns_id = vim.api.nvim_create_namespace("font_notifications_history")
 
   -- Highlight header
-  vim.api.nvim_buf_add_highlight(buf, ns_id, "Title", 0, 0, -1)
-  vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", 1, 0, -1)
+  utils.add_highlight(buf, ns_id, "Title", 0, 0, -1)
+  utils.add_highlight(buf, ns_id, "Special", 1, 0, -1)
 
   -- Highlight each notification title line
   for i, line in ipairs(lines) do
     if line:match("^%d+%. %[%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%]") then
       -- Define highlighting based on level in the line
       if line:match("ERROR:") then
-        vim.api.nvim_buf_add_highlight(buf, ns_id, "ErrorMsg", i-1, 0, -1)
+        utils.add_highlight(buf, ns_id, "ErrorMsg", i-1, 0, -1)
       elseif line:match("WARNING:") then
-        vim.api.nvim_buf_add_highlight(buf, ns_id, "WarningMsg", i-1, 0, -1)
+        utils.add_highlight(buf, ns_id, "WarningMsg", i-1, 0, -1)
       elseif line:match("DEBUG:") then
-        vim.api.nvim_buf_add_highlight(buf, ns_id, "Comment", i-1, 0, -1)
+        utils.add_highlight(buf, ns_id, "Comment", i-1, 0, -1)
       elseif line:match("INFO:") then
-        vim.api.nvim_buf_add_highlight(buf, ns_id, "Statement", i-1, 0, -1)
+        utils.add_highlight(buf, ns_id, "Statement", i-1, 0, -1)
       end
     elseif line:match("^%-%-%-%-%-") then
       -- Separator lines
-      vim.api.nvim_buf_add_highlight(buf, ns_id, "NonText", i-1, 0, -1)
+      utils.add_highlight(buf, ns_id, "NonText", i-1, 0, -1)
     end
   end
 
@@ -412,8 +412,8 @@ function M.apply_font(font)
   vim.o.guifont = font
 
   -- Also set nvim-qt specific setting if available
-  if vim.fn.exists("*GuiFont") == 1 then
-    pcall(vim.cmd, "GuiFont " .. font)
+  if vim.fn.exists(":GuiFont") == 2 then
+    vim.cmd("GuiFont " .. font)
   end
 
   return font

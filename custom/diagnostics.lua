@@ -6,7 +6,7 @@
 local M = {}
 
 -- Get the utility functions
-local utils = require("custom.utils")
+local utils = _G.require_and_setup("custom.utils", false)
 
 -- Helper function to get environment information for diagnostics
 function M.get_env_info()
@@ -311,7 +311,7 @@ function M.get_nvim_settings()
       end
 
       -- Show information about pre-validated fonts from fonts.lua
-      local fonts_module = require("custom.fonts")
+      local fonts_module = _G.require_and_setup("custom.fonts", false)
       if fonts_module._validated_fonts and not vim.tbl_isempty(fonts_module._validated_fonts) then
         table.insert(settings, "")
         table.insert(settings, "  Pre-validated fonts (safe for nvim-qt):")
@@ -591,14 +591,14 @@ local function highlight_commands_section(buf, lines)
   -- Find and highlight just the section header
   for i = 1, #lines do
     if lines[i] == "Available Commands:" then
-      vim.api.nvim_buf_add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
+      utils.add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
       break
     end
   end
   -- Find and highlight the Color Test header
   for i = 1, #lines do
     if lines[i] == "Color Test (shows colored blocks):" then
-      vim.api.nvim_buf_add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
+      utils.add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
       break
     end
   end
@@ -714,7 +714,7 @@ function M.add_color_test_blocks(buf)
             hl_group, color, gui_colors[color] or "#FFFFFF"))
 
       -- Apply highlight using extmark
-      vim.api.nvim_buf_add_highlight(buf, ns_id, hl_group, line_num, col_start, col_end)
+      utils.add_highlight(buf, ns_id, hl_group, line_num, col_start, col_end)
     end
   end
 
@@ -742,7 +742,7 @@ function M.add_color_test_blocks(buf)
           hl_group, color, gui_bg_colors[color] or "#000000"))
 
     -- Apply highlight using extmark
-    vim.api.nvim_buf_add_highlight(buf, ns_id, hl_group, line_count - 4, col_start, col_end)
+    utils.add_highlight(buf, ns_id, hl_group, line_count - 4, col_start, col_end)
   end
 
   -- Second line of background colors (bright BG colors)
@@ -765,7 +765,7 @@ function M.add_color_test_blocks(buf)
           hl_group, color, gui_bg_colors[color] or "#000000"))
 
     -- Apply highlight using extmark
-    vim.api.nvim_buf_add_highlight(buf, ns_id, hl_group, line_count - 3, col_start, col_end)
+    utils.add_highlight(buf, ns_id, hl_group, line_count - 3, col_start, col_end)
   end
 
   -- Add 256 color palette - use a clearer approach
@@ -814,7 +814,7 @@ function M.add_color_test_blocks(buf)
               hl_group, color_idx, gui_color))
 
         -- Apply highlight
-        vim.api.nvim_buf_add_highlight(buf, ns_id, hl_group, line_num, col_start, col_end)
+        utils.add_highlight(buf, ns_id, hl_group, line_num, col_start, col_end)
       end
     end
   end
@@ -839,8 +839,8 @@ function M.add_color_test_blocks(buf)
   -- Apply highlighting to the header
   local text_line_count = vim.api.nvim_buf_line_count(buf)
   local text_ns_id = vim.api.nvim_create_namespace("diagnostics_text")
-  vim.api.nvim_buf_add_highlight(buf, text_ns_id, "Title", text_line_count - 11, 0, -1)
-  vim.api.nvim_buf_add_highlight(buf, text_ns_id, "Special", text_line_count - 10, 0, -1)
+  utils.add_highlight(buf, text_ns_id, "Title", text_line_count - 11, 0, -1)
+  utils.add_highlight(buf, text_ns_id, "Special", text_line_count - 10, 0, -1)
 end
 
 -- Add GUI/terminal specific recommendations to the diagnostics buffer
@@ -858,23 +858,23 @@ function M.add_recommendations(buf)
     -- Get current line count after adding header
     local line_count = vim.api.nvim_buf_line_count(buf)
     -- Highlight the header
-    vim.api.nvim_buf_add_highlight(buf, ns_id, "Title", line_count - 3, 0, -1)
-    vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", line_count - 2, 0, -1)
+    utils.add_highlight(buf, ns_id, "Title", line_count - 3, 0, -1)
+    utils.add_highlight(buf, ns_id, "Special", line_count - 2, 0, -1)
     -- Add and highlight each bullet point separately
     -- Bullet point 1
     vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"• You are running in a graphical environment (nvim-qt, neovide, etc.)"})
-    vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", line_count, 0, 1) -- Highlight bullet
+    utils.add_highlight(buf, ns_id, "Special", line_count, 0, 1) -- Highlight bullet
     -- Bullet point 2
     vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"• Make sure termguicolors is ON"})
-    vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", line_count + 1, 0, 1) -- Highlight bullet
+    utils.add_highlight(buf, ns_id, "Special", line_count + 1, 0, 1) -- Highlight bullet
     -- Bullet point 3
     vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"• This mode offers better color support and visual features"})
-    vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", line_count + 2, 0, 1) -- Highlight bullet
+    utils.add_highlight(buf, ns_id, "Special", line_count + 2, 0, 1) -- Highlight bullet
     -- Bullet point 4 with correct command
     vim.api.nvim_buf_set_lines(buf, -1, -1, false, {"• Use the :GUIMode command for proper settings"})
     local last_line = line_count + 3
     -- Highlight just the bullet point
-    vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", last_line, 0, 1)
+    utils.add_highlight(buf, ns_id, "Special", last_line, 0, 1)
   else
     -- Basic mode recommendations
     vim.api.nvim_buf_set_lines(buf, -1, -1, false, {
@@ -891,29 +891,29 @@ function M.add_recommendations(buf)
 
     -- Add highlighting
     local line_count = vim.api.nvim_buf_line_count(buf)
-    vim.api.nvim_buf_add_highlight(buf, ns_id, "Title", line_count - 8, 0, -1)
-    vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", line_count - 7, 0, -1)
+    utils.add_highlight(buf, ns_id, "Title", line_count - 8, 0, -1)
+    utils.add_highlight(buf, ns_id, "Special", line_count - 7, 0, -1)
 
     -- Highlight numbers and key terms
     for i = 6, 1, -1 do
       local line_num = line_count - i
       -- Highlight the number
-      vim.api.nvim_buf_add_highlight(buf, ns_id, "Number", line_num, 0, 1)
+      utils.add_highlight(buf, ns_id, "Number", line_num, 0, 1)
 
       -- Highlight special terms
       if i == 6 then
         -- Highlight the command name
-        vim.api.nvim_buf_add_highlight(buf, ns_id, "Identifier", line_num, 5, 14)
+        utils.add_highlight(buf, ns_id, "Identifier", line_num, 5, 14)
       elseif i == 5 then
         -- Highlight termguicolors
-        vim.api.nvim_buf_add_highlight(buf, ns_id, "Type", line_num, 13, 25)
+        utils.add_highlight(buf, ns_id, "Type", line_num, 13, 25)
       elseif i == 3 then
         -- Highlight terminal names
-        vim.api.nvim_buf_add_highlight(buf, ns_id, "String", line_num, 16, 21)
-        vim.api.nvim_buf_add_highlight(buf, ns_id, "String", line_num, 25, 33)
+        utils.add_highlight(buf, ns_id, "String", line_num, 16, 21)
+        utils.add_highlight(buf, ns_id, "String", line_num, 25, 33)
       elseif i == 1 then
         -- Highlight terminal type
-        vim.api.nvim_buf_add_highlight(buf, ns_id, "Type", line_num, 18, 33)
+        utils.add_highlight(buf, ns_id, "Type", line_num, 18, 33)
       end
     end
   end
@@ -1014,8 +1014,8 @@ function M.setup()
 
       -- Add highlighting for headers (safely with pcall)
       pcall(function()
-        vim.api.nvim_buf_add_highlight(buf, ns_id, "Title", 0, 0, -1)
-        vim.api.nvim_buf_add_highlight(buf, ns_id, "Special", 1, 0, -1)
+        utils.add_highlight(buf, ns_id, "Title", 0, 0, -1)
+        utils.add_highlight(buf, ns_id, "Special", 1, 0, -1)
       end)
 
       -- Only highlight section headers and keep the rest plain
@@ -1024,7 +1024,7 @@ function M.setup()
         -- Highlight just the "Environment variables:" header
         for i = 1, #lines do
           if lines[i] == "Environment variables:" then
-            vim.api.nvim_buf_add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
+            utils.add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
             break
           end
         end
@@ -1034,7 +1034,7 @@ function M.setup()
         -- Highlight just the "Neovim settings:" header
         for i = 1, #lines do
           if lines[i] == "Neovim settings:" then
-            vim.api.nvim_buf_add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
+            utils.add_highlight(buf, ns_id, "Label", i - 1, 0, -1)
             break
           end
         end

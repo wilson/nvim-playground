@@ -1,5 +1,5 @@
 -- Configuration for language servers and linters
--- This file is shared between init.lua and install_language_servers.sh
+-- This file is shared between init.lua and install_dev_tools.sh
 
 local M = {}
 

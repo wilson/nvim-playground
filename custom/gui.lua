@@ -4,21 +4,23 @@ function M.apply_gui_mode(theme)
   vim.g.terminal_mode = false
   vim.opt.termguicolors = true
 
-  local utils = require("custom.utils")
+  local utils = _G.require_and_setup("custom.utils", false)
   if utils.is_gui_environment() then
-    local fonts = require("custom.fonts")
+    local fonts = _G.require_and_setup("custom.fonts", false)
     fonts.set_best_font()
   end
 
   if theme then
-    local ok = pcall(vim.cmd, "colorscheme " .. theme)
-    if not ok then
+    local available = vim.fn.getcompletion(theme, "color")
+    if vim.tbl_contains(available, theme) then
+      vim.cmd("colorscheme " .. theme)
+    else
       vim.notify("Colorscheme '" .. theme .. "' not found. Colorscheme not applied.", vim.log.levels.WARN)
     end
   end
 
   if vim.fn.exists(":TSEnable") == 2 then
-    pcall(vim.cmd, "TSEnable highlight")
+    vim.cmd("TSEnable highlight")
   end
 
   -- Apply GUI appearance settings
@@ -39,7 +41,9 @@ function M.setup()
     callback = function()
       if vim.g.terminal_mode then
         vim.schedule(function()
-          pcall(vim.cmd, "GUIMode")
+          if vim.fn.exists(":GUIMode") == 2 then
+            vim.cmd("GUIMode")
+          end
         end)
       end
     end,

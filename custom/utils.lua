@@ -26,7 +26,21 @@ function M.is_apple_terminal()
   return vim.env.TERM_PROGRAM == 'Apple_Terminal'
 end
 
-
+-- Safely add a highlight to a buffer (handles deprecated nvim_buf_add_highlight)
+function M.add_highlight(buf, ns_id, hl_group, line, col_start, col_end)
+  if vim.api.nvim_buf_set_extmark then
+    local opts = { hl_group = hl_group }
+    if col_end == -1 then
+      opts.hl_eol = true
+    else
+      opts.end_col = col_end
+      opts.end_row = line
+    end
+    pcall(vim.api.nvim_buf_set_extmark, buf, ns_id, line, col_start, opts)
+  else
+    pcall(vim.api.nvim_buf_add_highlight, buf, ns_id, hl_group, line, col_start, col_end)
+  end
+end
 
 -- Create a read-only buffer with the given content
 function M.create_ro_buffer(lines, filetype)

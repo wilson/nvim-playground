@@ -62,9 +62,9 @@ function M.setup()
       local is_apple = utils.is_apple_terminal()
 
       if in_gui or not is_apple then
-        pcall(function() M.enable_gui_mode(false) end)
+        M.enable_gui_mode(false)
       else
-        pcall(function() M.enable_terminal_mode(false) end)
+        M.enable_terminal_mode(false)
       end
       vim.g._init_colors_done = true
     end,
