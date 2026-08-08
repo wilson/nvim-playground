@@ -31,6 +31,7 @@ function M.apply_gui_mode(theme)
     vim.cmd("GuiMacPrefix e")
   end
 
+  ---@diagnostic disable-next-line: param-type-mismatch
   vim.api.nvim_exec_autocmds("User", { pattern = "GUIModeApplied" })
 end
 

@@ -36,7 +36,7 @@ if [ "$SHOW_HELP" -eq 1 ]; then
   echo
   echo "Description:"
   echo "  This script installs language servers and linters used by Neovim."
-  echo "  It reads configuration from $HOME/.config/nvim/config/languages.lua"
+  echo "  It reads configuration from $HOME/.config/nvim/custom/languages.lua"
   echo "  and installs all tools listed in language_servers and linters sections."
   echo "  The script uses Mason, Homebrew/pkg, npm, gem, pip, cargo, etc. as needed."
   exit 0
@@ -53,7 +53,7 @@ elif [[ "$(uname)" == "Linux" ]]; then
 fi
 
 # NOTE: For FreeBSD users, you may need to adjust package names in
-# ~/.config/nvim/config/languages.lua if the installation fails with pkg.
+# ~/.config/nvim/custom/languages.lua if the installation fails with pkg.
 # Common naming patterns for FreeBSD packages are:
 # - Python packages: py-packagename or py39-packagename
 # - Ruby gems: rubygem-packagename
@@ -100,7 +100,7 @@ command_exists() {
 }
 
 # Extract language servers and linters from the shared config file
-CONFIG_FILE="$HOME/.config/nvim/config/languages.lua"
+CONFIG_FILE="$HOME/.config/nvim/custom/languages.lua"
 
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "Error: Config file $CONFIG_FILE not found"
@@ -109,8 +109,8 @@ if [ ! -f "$CONFIG_FILE" ]; then
   echo "the list of language servers and linters that need to be installed."
   echo
   echo "You can create it by running:"
-  echo "  mkdir -p $HOME/.config/nvim/config"
-  echo "  touch $HOME/.config/nvim/config/languages.lua"
+  echo "  mkdir -p $HOME/.config/nvim/custom"
+  echo "  touch $HOME/.config/nvim/custom/languages.lua"
   echo
   echo "And then add the necessary configuration."
   exit 1
@@ -876,7 +876,7 @@ main() {
   colored_echo "${BOLD}=== Neovim Development Tools Installer ===${RESET}"
   if [ $QUIET_MODE -eq 0 ]; then
     echo "This script will install language servers and linters for Neovim"
-    echo "Based on configuration in $HOME/.config/nvim/config/languages.lua"
+    echo "Based on configuration in $HOME/.config/nvim/custom/languages.lua"
     echo "Use --quiet or -q for less verbose output"
     echo "Current OS: $OS_TYPE"
   fi
@@ -978,9 +978,7 @@ main() {
         
         # Copy fonts
         colored_echo "${BLUE}Copying SF Mono fonts from Terminal.app to ~/Library/Fonts/${RESET}"
-        cp /System/Applications/Utilities/Terminal.app/Contents/Resources/Fonts/SF-*.otf ~/Library/Fonts/
-        
-        if [ $? -eq 0 ]; then
+        if cp /System/Applications/Utilities/Terminal.app/Contents/Resources/Fonts/SF-*.otf ~/Library/Fonts/; then
           colored_echo "${GREEN}SF Mono fonts installed successfully.${RESET}"
         else
           colored_echo "${RED}Failed to copy SF Mono fonts.${RESET}"
