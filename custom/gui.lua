@@ -8,9 +8,11 @@ function M.apply_gui_mode(theme)
   vim.opt.termguicolors = true
 
   local utils = _G.require_and_setup("custom.utils", false)
-  if utils.is_gui_environment() then
+  if utils and utils.is_gui_environment() then
     local fonts = _G.require_and_setup("custom.fonts", false)
-    fonts.set_best_font()
+    if fonts then
+      fonts.set_best_font()
+    end
   end
 
   if theme then
@@ -40,6 +42,7 @@ end
 
 function M.setup()
   -- Legacy GUI clients might still fire these events later
+  ---@diagnostic disable-next-line: param-type-mismatch
   vim.api.nvim_create_autocmd("User", {
     pattern = {"GuiLoaded", "GUIEnter"},
     callback = function()
