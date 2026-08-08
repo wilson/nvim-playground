@@ -52,7 +52,7 @@ M.treesitter_parsers = {
   -- Config file formats
   "json", "toml", "yaml", "xml",
   -- Documentation formats
-  "markdown", "markdown_inline",
+  -- "markdown", "markdown_inline", -- See TODO.md, disabled due to Neovim 0.12 upstream breakage
   -- Vim/Neovim specific formats
   "vim", "vimdoc", "query",
   -- Core languages

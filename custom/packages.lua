@@ -196,9 +196,11 @@ function M.build_specs(languages_config)
           -- Don't enable highlighting by default (we'll do it in GUIMode)
           highlight = {
             enable = false,
+            disable = { "markdown", "markdown_inline" }, -- See TODO.md, disabled due to Neovim 0.12 upstream breakage
           },
           indent = {
             enable = true,
+            disable = { "markdown", "markdown_inline" }, -- See TODO.md, disabled due to Neovim 0.12 upstream breakage
           },
           textobjects = {
             select = {
